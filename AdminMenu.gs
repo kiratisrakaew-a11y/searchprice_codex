@@ -106,7 +106,8 @@ function adminRunPhase1TestChecks() {
     milestone_13_unit_conversion: runMilestone13UnitConversionSmokeTest(),
     milestone_14_gemini_boundary: runMilestone14GeminiBoundarySmokeTest(),
     milestone_15_search_log: runMilestone15SearchLogSmokeTest(),
-    milestone_16_admin_menu: runMilestone16AdminMenuSmokeTest()
+    milestone_16_admin_menu: runMilestone16AdminMenuSmokeTest(),
+    milestone_17_checklist_validation: runMilestone17ChecklistValidationSuite()
   });
 }
 

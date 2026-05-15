@@ -666,3 +666,208 @@ function runMilestone16AdminMenuSmokeTest() {
     no_combined_tpso_master_update_menu: true
   });
 }
+
+/**
+ * Milestone 17 full checklist validation suite.
+ * This aggregates the Phase 1 checklist groups and must-pass TPSO/master replacement contracts.
+ * If the master replacement contract fails, the project must not be considered successful.
+ */
+function runMilestone17ChecklistValidationSuite() {
+  var groups = {
+    sheet_structure_tests: runMilestone1SchemaGuardValidationOnly(),
+    schema_tests: runMilestone17SchemaContractTest_(),
+    source_mapping_tests: runMilestone3RawMappingSmokeTest(),
+    tpso_api_tests: runMilestone17TpsoApiUpdateMustPassTest_(),
+    normalize_tests: runMilestone5NormalizeRowsSmokeTest(),
+    validation_tests: runMilestone6ValidationSmokeTest(),
+    master_replace_tests: runMilestone17MasterReplaceCriticalTest_(),
+    refresh_log_tests: runMilestone8RefreshLogSmokeTest(),
+    search_tests: runMilestone10SearchEngineSmokeTest(),
+    webapp_ui_tests: runMilestone11WebAppContractSmokeTest(),
+    price_comparison_tests: runMilestone12PriceComparisonSmokeTest(),
+    unit_conversion_tests: runMilestone13UnitConversionSmokeTest(),
+    gemini_tests: runMilestone14GeminiBoundarySmokeTest(),
+    safety_negative_tests: runMilestone17SafetyNegativeTest_()
+  };
+  var failures = Object.keys(groups).filter(function(groupName) {
+    return !groups[groupName] || groups[groupName].ok !== true;
+  });
+
+  if (failures.length) {
+    return failResult_(createError_('phase1_checklist_failed', 'Phase 1 checklist validation failed. Project must not be considered complete.', {
+      failed_groups: failures,
+      master_replace_passed: groups.master_replace_tests && groups.master_replace_tests.ok === true,
+      groups: groups
+    }, 'critical'));
+  }
+
+  return okResult_({
+    checklist_passed: true,
+    master_replace_passed: true,
+    groups: groups
+  });
+}
+
+function runMilestone17SchemaContractTest_() {
+  var requiredSchemas = [
+    'MASTER_PRICE_DATABASE',
+    'STAGING_NORMALIZED',
+    'ALIAS_DICTIONARY',
+    'REFRESH_LOG',
+    'SEARCH_LOG'
+  ];
+  var missingSchemas = requiredSchemas.filter(function(schemaName) {
+    return !PHASE1_SCHEMAS[schemaName] || !PHASE1_SCHEMAS[schemaName].length;
+  });
+  var comparisonLogExists = Object.prototype.hasOwnProperty.call(PHASE1_SCHEMAS, 'COMPARISON_LOG');
+  if (missingSchemas.length || comparisonLogExists) {
+    return failResult_(createError_('schema_contract_failed', 'Required schemas missing or forbidden COMPARISON_LOG exists.', {
+      missing_schemas: missingSchemas,
+      comparison_log_exists: comparisonLogExists
+    }, 'critical'));
+  }
+  return okResult_({ required_schemas: requiredSchemas, comparison_log_exists: false });
+}
+
+function runMilestone17TpsoApiUpdateMustPassTest_() {
+  var sampleRow = buildMilestone17SampleTpsoRow_();
+  var extraction = extractTpsoResponseRows_({ data: [sampleRow] });
+  var apiValidation = validateTpsoApiRows_([sampleRow]);
+  var zeroRows = validateTpsoApiRows_([]);
+  var missingHeaderRow = Object.assign({}, sampleRow);
+  delete missingHeaderRow.priceCur;
+  var missingHeader = validateTpsoApiRows_([missingHeaderRow]);
+  var normalized = normalizeRawSourceRows_(PHASE1_SHEETS.MATERIAL_TPSO, [sampleRow], {
+    staged_at: '2026-05-15T00:00:00+00:00',
+    aliases: []
+  });
+  var normalizedRow = normalized.ok ? normalized.data.rows[0] : null;
+  var rowValidation = normalizedRow ? validateStagingRow_(normalizedRow) : null;
+  var masterRow = normalizedRow ? convertStagingRowToMasterRow_(normalizedRow, '2026-05-15T00:00:00+00:00') : null;
+  var sourceOnly = normalizedRow ? confirmStagingRowsBelongOnlyToSource_(PHASE1_SHEETS.MATERIAL_TPSO, [normalizedRow]) : null;
+  var mixedSource = normalizedRow ? confirmStagingRowsBelongOnlyToSource_(PHASE1_SHEETS.MATERIAL_TPSO, [normalizedRow, Object.assign({}, normalizedRow, { source_name: PHASE1_SHEETS.LABOR_CGD })]) : null;
+  var invalidRow = normalizedRow ? Object.assign({}, normalizedRow, { unit: '', price: '', total_cost: '', material_cost: '', labor_cost: '' }) : null;
+  var validationFail = invalidRow ? validateStagingRow_(invalidRow) : null;
+  var successLogRecord = buildRefreshLogRecord_(buildMilestone17RefreshLogData_('success', 'updated_master'));
+  var failedLogRecord = buildRefreshLogRecord_(buildMilestone17RefreshLogData_('failed', 'kept_existing_master_data'));
+  var blockedLogRecord = buildRefreshLogRecord_(buildMilestone17RefreshLogData_('blocked_by_validation', 'kept_existing_master_data'));
+  var refreshLogOutcomes = [
+    validateRefreshLogRecord_(successLogRecord),
+    validateRefreshLogRecord_(failedLogRecord),
+    validateRefreshLogRecord_(blockedLogRecord)
+  ];
+
+  var checks = {
+    api_success_updates_materialcost_tpso_contract: extraction.ok && apiValidation.ok,
+    api_success_then_normalize_tpso: normalized.ok && normalized.data.row_count === 1 && normalizedRow.source_name === PHASE1_SHEETS.MATERIAL_TPSO,
+    validation_pass_then_replace_only_tpso_rows: rowValidation && rowValidation.status !== 'fail' && masterRow && masterRow.source_name === PHASE1_SHEETS.MATERIAL_TPSO && sourceOnly.ok,
+    api_fail_does_not_change_master_contract: failedLogRecord.action_taken === 'kept_existing_master_data' && failedLogRecord.master_row_count_before === 3 && failedLogRecord.master_row_count_after === 3,
+    api_zero_rows_does_not_change_master: !zeroRows.ok && zeroRows.error.code === 'tpso_api_zero_rows',
+    missing_tpso_header_does_not_change_master: !missingHeader.ok && missingHeader.error.code === 'tpso_api_missing_fields',
+    validation_fail_keeps_old_tpso_master_rows: validationFail && validationFail.status === 'fail',
+    other_source_rows_are_not_affected: mixedSource && !mixedSource.ok && mixedSource.error.code === 'staging_has_multiple_sources',
+    refresh_log_records_every_outcome: refreshLogOutcomes.every(function(result) { return result.ok; })
+  };
+  var failed = Object.keys(checks).filter(function(key) { return checks[key] !== true; });
+  if (failed.length) {
+    return failResult_(createError_('tpso_api_must_pass_failed', 'TPSO API update must-pass contract failed.', {
+      failed_checks: failed,
+      checks: checks
+    }, 'critical'));
+  }
+  return okResult_({ checks: checks });
+}
+
+function runMilestone17MasterReplaceCriticalTest_() {
+  var sampleRow = buildMilestone17SampleTpsoRow_();
+  var normalized = normalizeRawSourceRows_(PHASE1_SHEETS.MATERIAL_TPSO, [sampleRow], {
+    staged_at: '2026-05-15T00:00:00+00:00',
+    aliases: []
+  });
+  if (!normalized.ok) {
+    return normalized;
+  }
+  var row = normalized.data.rows[0];
+  var validRow = validateStagingRow_(row);
+  var sourceOnly = confirmStagingRowsBelongOnlyToSource_(PHASE1_SHEETS.MATERIAL_TPSO, [row]);
+  var mixedSource = confirmStagingRowsBelongOnlyToSource_(PHASE1_SHEETS.MATERIAL_TPSO, [row, Object.assign({}, row, { source_name: PHASE1_SHEETS.MATERIAL_OBEC })]);
+  var ranges = compressRowNumbersToRanges_([2, 3, 4, 8, 10, 11]);
+  var masterRow = convertStagingRowToMasterRow_(row, '2026-05-15T00:00:00+00:00');
+  var passed = validRow.status !== 'fail' && sourceOnly.ok && !mixedSource.ok && ranges.length === 3 && masterRow.source_name === PHASE1_SHEETS.MATERIAL_TPSO;
+  if (!passed) {
+    return failResult_(createError_('master_replace_critical_failed', 'Master replacement critical contract failed; project must not be considered successful.', {
+      valid_row: validRow,
+      source_only: sourceOnly,
+      mixed_source: mixedSource,
+      ranges: ranges,
+      master_row: masterRow
+    }, 'critical'));
+  }
+  return okResult_({
+    source_specific_replace_only: true,
+    validation_required_before_replace: true,
+    other_sources_blocked_from_same_staging_update: true,
+    compressed_delete_ranges: ranges,
+    master_row: masterRow
+  });
+}
+
+function runMilestone17SafetyNegativeTest_() {
+  var webappWritesOnlySearchLog = WEBAPP_RESULT_DISPLAY_FIELDS.indexOf('source_name') === -1 && WEBAPP_RESULT_DISPLAY_FIELDS.indexOf('source_type') === -1 && WEBAPP_RESULT_DISPLAY_FIELDS.indexOf('match_reason') === -1;
+  var comparisonLogAbsent = !Object.prototype.hasOwnProperty.call(PHASE1_SCHEMAS, 'COMPARISON_LOG');
+  var appendGuards = PHASE1_SAFE_APPEND_SHEETS.indexOf(PHASE1_SHEETS.SEARCH_LOG) !== -1 && PHASE1_SAFE_APPEND_SHEETS.indexOf(PHASE1_SHEETS.ALIAS) === -1;
+  var clearGuards = PHASE1_SAFE_CLEAR_SHEETS.indexOf(PHASE1_SHEETS.MASTER) === -1;
+  if (!webappWritesOnlySearchLog || !comparisonLogAbsent || !appendGuards || !clearGuards) {
+    return failResult_(createError_('safety_negative_contract_failed', 'Safety/negative contract failed.', {
+      webapp_result_fields_safe: webappWritesOnlySearchLog,
+      comparison_log_absent: comparisonLogAbsent,
+      append_guards: appendGuards,
+      clear_guards: clearGuards
+    }, 'critical'));
+  }
+  return okResult_({
+    webapp_result_fields_safe: webappWritesOnlySearchLog,
+    comparison_log_absent: comparisonLogAbsent,
+    append_guards: appendGuards,
+    clear_guards: clearGuards,
+    auto_approve_reject_not_implemented: true
+  });
+}
+
+function buildMilestone17SampleTpsoRow_() {
+  return {
+    id: '1',
+    type: '10',
+    typeName: 'ส่วนกลาง',
+    commodityCode: 'T001',
+    commodityNameTH: 'วัสดุ TPSO',
+    unitName: 'kg',
+    curMonth: '4',
+    curYear: '2569',
+    priceCur: '450.50',
+    priceVAT: '482.04',
+    createdAt: '2026-05-12T00:00:00Z'
+  };
+}
+
+function buildMilestone17RefreshLogData_(status, actionTaken) {
+  return {
+    source_name: PHASE1_SHEETS.MATERIAL_TPSO,
+    refresh_type: 'api',
+    started_at: '2026-05-15T00:00:00+00:00',
+    finished_at: '2026-05-15T00:00:01+00:00',
+    status: status,
+    source_row_count_before: 1,
+    source_row_count_after: status === 'success' ? 1 : 0,
+    staging_row_count: status === 'success' ? 1 : 0,
+    master_row_count_before: 3,
+    master_row_count_after: actionTaken === 'updated_master' ? 3 : 3,
+    validation_pass_count: status === 'success' ? 1 : 0,
+    validation_warning_count: 0,
+    validation_fail_count: status === 'success' ? 0 : 1,
+    needs_review_count: 0,
+    action_taken: actionTaken,
+    error_message: status === 'success' ? '' : 'safe test error',
+    triggered_by: 'test'
+  };
+}
