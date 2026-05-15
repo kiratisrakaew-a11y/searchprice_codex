@@ -31,7 +31,8 @@ function compareUserPriceToMaster_(masterRow, input) {
     user_quantity: normalizedInput.user_quantity,
     user_price_type: normalizedInput.user_price_type,
     selected_item_name: masterRow.item_name_clean || masterRow.item_name_original,
-    note: masterRow.note
+    note: masterRow.note,
+    known_conversion_facts: normalizedInput.user_note
   });
   if (!conversionResult.ok) {
     return buildCannotCompareResult_(masterRow, normalizedInput, 'Cannot compare because units could not be converted safely.', {

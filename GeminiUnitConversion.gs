@@ -7,6 +7,26 @@ const GEMINI_UNIT_CONVERSION_MODEL_PROPERTY = 'GEMINI_UNIT_CONVERSION_MODEL';
 const GEMINI_API_KEY_PROPERTY = 'GEMINI_API_KEY';
 const DEFAULT_GEMINI_UNIT_CONVERSION_MODEL = 'gemini-2.5-flash';
 const GEMINI_GENERATE_CONTENT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
+const GEMINI_UNIT_ALLOWED_INPUT_KEYS = Object.freeze([
+  'database_unit',
+  'user_unit',
+  'user_quantity',
+  'user_price_type',
+  'selected_item_name',
+  'note',
+  'known_conversion_facts'
+]);
+const GEMINI_UNIT_REQUIRED_OUTPUT_KEYS = Object.freeze([
+  'status',
+  'conversion_possible',
+  'required_user_input',
+  'conversion_factor',
+  'converted_value',
+  'converted_unit',
+  'assumption_used',
+  'explanation',
+  'cannot_compare_reason'
+]);
 
 function convertPricePerUnitWithGeminiFallback_(pricePerUserUnit, userUnit, referenceUnit, context) {
   var ruleResult = convertPricePerUnitToReferenceUnit_(pricePerUserUnit, userUnit, referenceUnit);
@@ -40,7 +60,7 @@ function convertPricePerUnitWithGeminiFallback_(pricePerUserUnit, userUnit, refe
   }
 
   return okResult_({
-    comparable_price: convertedValue,
+    comparable_price: parseNumber_(pricePerUserUnit) / conversionFactor,
     conversion_status: 'converted',
     conversion_source: 'gemini',
     conversion_note: interpretation.explanation || 'Gemini interpreted the unit conversion after rule-based conversion was unavailable.',
@@ -102,24 +122,18 @@ function askGeminiForUnitConversion_(pricePerUserUnit, userUnit, referenceUnit, 
 }
 
 function buildGeminiUnitConversionPayload_(pricePerUserUnit, userUnit, referenceUnit, context) {
+  var boundaryInput = buildGeminiUnitBoundaryInput_(userUnit, referenceUnit, context || {});
   var prompt = [
     'You are assisting a Google Apps Script price comparison tool with unit interpretation only.',
     'Do not guess prices. Do not approve or reject prices. Do not classify high or low. Do not modify any data.',
-    'Return JSON only with these exact fields: status, conversion_possible, required_user_input, conversion_factor, converted_value, converted_unit, assumption_used, explanation, cannot_compare_reason.',
+    'Do not request or expose credentials, API keys, personal data, source sheets, or the full master database.',
+    'Return JSON only with these exact fields: ' + GEMINI_UNIT_REQUIRED_OUTPUT_KEYS.join(', ') + '.',
     'Use status success only if conversion is safe from the provided information. Otherwise use need_more_info or cannot_compare.',
     'conversion_factor means how many database/reference units are in 1 user unit.',
-    'converted_value must be the provided user unit price converted to price per database/reference unit.',
+    'converted_value must be the converted unit quantity for 1 user unit, not a price.',
     'If data such as meters per roll, kg per bag, points per job, components per set, or trip distance/volume is missing, return need_more_info or cannot_compare.',
-    'Input:',
-    JSON.stringify({
-      database_unit: referenceUnit,
-      user_unit: userUnit,
-      user_unit_price: pricePerUserUnit,
-      user_quantity: context.user_quantity || '',
-      user_price_type: context.user_price_type || '',
-      selected_item_name: context.selected_item_name || '',
-      note: context.note || ''
-    })
+    'Input JSON contains only allowlisted fields:',
+    JSON.stringify(boundaryInput)
   ].join('\n');
 
   return {
@@ -133,6 +147,23 @@ function buildGeminiUnitConversionPayload_(pricePerUserUnit, userUnit, reference
   };
 }
 
+function buildGeminiUnitBoundaryInput_(userUnit, referenceUnit, context) {
+  var rawInput = {
+    database_unit: cleanDisplayText_(referenceUnit),
+    user_unit: cleanDisplayText_(userUnit),
+    user_quantity: valueOrBlank_(context.user_quantity),
+    user_price_type: cleanDisplayText_(context.user_price_type),
+    selected_item_name: cleanDisplayText_(context.selected_item_name),
+    note: cleanDisplayText_(context.note),
+    known_conversion_facts: cleanDisplayText_(context.known_conversion_facts)
+  };
+
+  return GEMINI_UNIT_ALLOWED_INPUT_KEYS.reduce(function(allowedInput, key) {
+    allowedInput[key] = rawInput[key] || '';
+    return allowedInput;
+  }, {});
+}
+
 function parseGeminiUnitConversionText_(text) {
   var cleaned = cleanGeminiJsonText_(text);
   var parsed;
@@ -142,6 +173,11 @@ function parseGeminiUnitConversionText_(text) {
     return failResult_(createError_('gemini_structured_output_invalid', 'Gemini unit interpretation was not structured JSON.', {
       response_excerpt: safeGeminiResponseExcerpt_(text)
     }, 'warning'));
+  }
+
+  var requiredFieldsResult = validateGeminiRequiredOutputFields_(parsed);
+  if (!requiredFieldsResult.ok) {
+    return requiredFieldsResult;
   }
 
   var normalized = normalizeGeminiUnitConversionResult_(parsed);
@@ -165,6 +201,18 @@ function normalizeGeminiUnitConversionResult_(result) {
     explanation: cleanDisplayText_(result.explanation),
     cannot_compare_reason: cleanDisplayText_(result.cannot_compare_reason)
   };
+}
+
+function validateGeminiRequiredOutputFields_(result) {
+  var missingKeys = GEMINI_UNIT_REQUIRED_OUTPUT_KEYS.filter(function(key) {
+    return !Object.prototype.hasOwnProperty.call(result || {}, key);
+  });
+  if (missingKeys.length) {
+    return failResult_(createError_('gemini_output_missing_fields', 'Gemini response is missing required structured fields.', {
+      missing_fields: missingKeys
+    }, 'warning'));
+  }
+  return okResult_({});
 }
 
 function validateGeminiUnitConversionResult_(result) {

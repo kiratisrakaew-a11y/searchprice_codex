@@ -466,3 +466,80 @@ function runMilestone13UnitConversionSmokeTest() {
     }
   });
 }
+
+/**
+ * Static smoke test for Milestone 14 Gemini input/output boundary.
+ * Does not call Gemini or mutate sheets.
+ */
+function runMilestone14GeminiBoundarySmokeTest() {
+  var payload = buildGeminiUnitConversionPayload_(9999, 'bag', 'kg', {
+    user_quantity: 2,
+    user_price_type: 'material',
+    selected_item_name: 'ปูนซีเมนต์',
+    note: 'Use note only when needed.',
+    known_conversion_facts: '1 bag = 50 kg',
+    MASTER_PRICE_DATABASE: 'forbidden master dump',
+    source_sheet: 'forbidden source dump',
+    api_key: 'SECRET_SHOULD_NOT_APPEAR',
+    personal_user_data: 'forbidden personal data',
+    irrelevant_data: 'forbidden irrelevant data'
+  });
+  var boundaryInput = buildGeminiUnitBoundaryInput_('bag', 'kg', {
+    user_quantity: 2,
+    user_price_type: 'material',
+    selected_item_name: 'ปูนซีเมนต์',
+    note: 'Use note only when needed.',
+    known_conversion_facts: '1 bag = 50 kg',
+    MASTER_PRICE_DATABASE: 'forbidden master dump',
+    source_sheet: 'forbidden source dump',
+    api_key: 'SECRET_SHOULD_NOT_APPEAR',
+    personal_user_data: 'forbidden personal data',
+    irrelevant_data: 'forbidden irrelevant data'
+  });
+  var payloadText = JSON.stringify(payload);
+  var disallowedTokens = [
+    'forbidden master dump',
+    'forbidden source dump',
+    'SECRET_SHOULD_NOT_APPEAR',
+    'forbidden personal data',
+    'forbidden irrelevant data',
+    '9999'
+  ];
+  var leakedTokens = disallowedTokens.filter(function(token) {
+    return payloadText.indexOf(token) !== -1;
+  });
+  var unexpectedKeys = Object.keys(boundaryInput).filter(function(key) {
+    return GEMINI_UNIT_ALLOWED_INPUT_KEYS.indexOf(key) === -1;
+  });
+  var missingAllowedKeys = GEMINI_UNIT_ALLOWED_INPUT_KEYS.filter(function(key) {
+    return !Object.prototype.hasOwnProperty.call(boundaryInput, key);
+  });
+  var invalidJson = parseGeminiUnitConversionText_('not json');
+  var missingOutput = parseGeminiUnitConversionText_(JSON.stringify({ status: 'success' }));
+
+  if (leakedTokens.length) {
+    return failResult_(createError_('gemini_boundary_leaked_disallowed_input', 'Gemini prompt leaked disallowed input.', { leaked_tokens: leakedTokens }, 'critical'));
+  }
+  if (unexpectedKeys.length || missingAllowedKeys.length) {
+    return failResult_(createError_('gemini_boundary_input_keys_invalid', 'Gemini boundary input keys are not exactly the allowlist.', {
+      unexpected_keys: unexpectedKeys,
+      missing_allowed_keys: missingAllowedKeys
+    }, 'critical'));
+  }
+  if (invalidJson.ok || invalidJson.error.code !== 'gemini_structured_output_invalid') {
+    return failResult_(createError_('gemini_boundary_parse_failure_not_safe', 'Invalid Gemini JSON must fail safely.', { result: invalidJson }, 'critical'));
+  }
+  if (missingOutput.ok || missingOutput.error.code !== 'gemini_output_missing_fields') {
+    return failResult_(createError_('gemini_boundary_missing_fields_not_safe', 'Missing Gemini output fields must fail safely.', { result: missingOutput }, 'critical'));
+  }
+
+  return okResult_({
+    boundary_input: boundaryInput,
+    invalid_json_error: invalidJson.error.code,
+    missing_output_error: missingOutput.error.code,
+    leaked_tokens: leakedTokens,
+    gemini_can_edit_sheets: false,
+    sends_api_key_to_gemini: false,
+    sends_master_database_to_gemini: false
+  });
+}
