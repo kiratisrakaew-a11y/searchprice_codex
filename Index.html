@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      :root {
+        color-scheme: light;
+        --border: #d8dee9;
+        --muted: #5f6b7a;
+        --primary: #0b57d0;
+        --danger: #b3261e;
+        --surface: #ffffff;
+        --surface-alt: #f7f9fc;
+      }
+
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: var(--surface-alt);
+        color: #1f2937;
+      }
+
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      h1, h2, h3 {
+        margin-top: 0;
+      }
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 18px;
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      }
+
+      .search-row {
+        display: flex;
+        gap: 10px;
+        align-items: stretch;
+      }
+
+      input[type="search"] {
+        flex: 1;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 16px;
+        padding: 12px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 8px;
+        background: var(--primary);
+        color: white;
+        cursor: pointer;
+        font-weight: 700;
+        padding: 10px 16px;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .status {
+        margin-top: 12px;
+        color: var(--muted);
+      }
+
+      .error {
+        color: var(--danger);
+        font-weight: 700;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .cards {
+        display: grid;
+        gap: 12px;
+      }
+
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px;
+        background: #fff;
+      }
+
+      .card.selected {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 2px rgba(11, 87, 208, 0.15);
+      }
+
+      .card-title {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .field-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 8px 12px;
+      }
+
+      .field-label {
+        color: var(--muted);
+        display: block;
+        font-size: 12px;
+      }
+
+      .field-value {
+        font-weight: 600;
+        word-break: break-word;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+      }
+
+      .readonly-badge {
+        display: inline-block;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 12px;
+        padding: 3px 8px;
+      }
+
+      @media (max-width: 640px) {
+        main {
+          padding: 14px;
+        }
+        .search-row {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <h1>Phase 1 Price Search</h1>
+        <p class="muted">Search the master price database, then manually select one result to view read-only details.</p>
+        <form id="search-form" class="search-row">
+          <input id="query" type="search" autocomplete="off" placeholder="ค้นหา เช่น ปูนซีเมนต์, สาย VAF 2x2.5" aria-label="Search query">
+          <button id="search-button" type="submit">Search</button>
+        </form>
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+      </section>
+
+      <section id="results-panel" class="panel" hidden>
+        <h2>Results</h2>
+        <div id="no-result" class="muted" hidden>No direct match found. Try a different term or review nearby results if shown.</div>
+        <div id="suggestions" class="muted"></div>
+        <div id="results" class="cards"></div>
+      </section>
+
+      <section id="detail-panel" class="panel" hidden>
+        <h2>Selected Item Detail <span class="readonly-badge">Read-only</span></h2>
+        <p class="muted">This detail view is populated only after you click Select on a result card. It does not edit source, staging, master, or alias sheets.</p>
+        <div id="detail" class="detail-grid"></div>
+      </section>
+    </main>
+
+    <script>
+      var state = {
+        sessionId: '',
+        selectedMasterId: ''
+      };
+
+      var form = document.getElementById('search-form');
+      var queryInput = document.getElementById('query');
+      var searchButton = document.getElementById('search-button');
+      var statusEl = document.getElementById('status');
+      var resultsPanel = document.getElementById('results-panel');
+      var resultsEl = document.getElementById('results');
+      var noResultEl = document.getElementById('no-result');
+      var suggestionsEl = document.getElementById('suggestions');
+      var detailPanel = document.getElementById('detail-panel');
+      var detailEl = document.getElementById('detail');
+
+      form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        runSearch();
+      });
+
+      function runSearch() {
+        var query = queryInput.value.trim();
+        clearError();
+        clearSelection();
+        if (!query) {
+          showError('Please enter a search term.');
+          return;
+        }
+
+        setLoading(true, 'Searching...');
+        resultsPanel.hidden = true;
+        resultsEl.innerHTML = '';
+        noResultEl.hidden = true;
+        suggestionsEl.textContent = '';
+
+        google.script.run
+          .withSuccessHandler(handleSearchSuccess)
+          .withFailureHandler(handleServerFailure)
+          .webAppSearchPrices(query, state.sessionId);
+      }
+
+      function handleSearchSuccess(response) {
+        setLoading(false, '');
+        if (!response || !response.ok) {
+          showError(getErrorMessage(response, 'Search failed.'));
+          return;
+        }
+
+        var data = response.data || {};
+        state.sessionId = data.session_id || state.sessionId;
+        renderResults(data);
+      }
+
+      function renderResults(data) {
+        var results = data.results || [];
+        resultsPanel.hidden = false;
+        noResultEl.hidden = results.length > 0 && data.no_direct_match !== true;
+
+        if (data.suggested_terms && data.suggested_terms.length) {
+          suggestionsEl.textContent = 'Suggested terms: ' + data.suggested_terms.join(', ');
+        } else {
+          suggestionsEl.textContent = '';
+        }
+
+        if (!results.length) {
+          resultsEl.innerHTML = '<p class="muted">No results found.</p>';
+          return;
+        }
+
+        resultsEl.innerHTML = '';
+        results.forEach(function(card) {
+          resultsEl.appendChild(createResultCard(card));
+        });
+      }
+
+      function createResultCard(card) {
+        var wrapper = document.createElement('article');
+        wrapper.className = 'card';
+        wrapper.dataset.masterId = card.master_id || '';
+
+        var title = document.createElement('div');
+        title.className = 'card-title';
+        title.innerHTML = '<h3>' + escapeHtml(card.item_name || '-') + '</h3>';
+
+        var selectButton = document.createElement('button');
+        selectButton.type = 'button';
+        selectButton.textContent = 'Select';
+        selectButton.addEventListener('click', function() {
+          selectResult(card.master_id, wrapper);
+        });
+        title.appendChild(selectButton);
+        wrapper.appendChild(title);
+
+        wrapper.appendChild(createFieldGrid([
+          ['unit', card.unit],
+          ['material_cost', card.material_cost],
+          ['labor_cost', card.labor_cost],
+          ['total_cost', card.total_cost],
+          ['price_basis', card.price_basis],
+          ['match_score', card.match_score],
+          ['needs_review', card.needs_review || '-'],
+          ['note', card.note || '-']
+        ]));
+        return wrapper;
+      }
+
+      function selectResult(masterId, selectedCard) {
+        if (!masterId) {
+          showError('Selected result is missing master_id.');
+          return;
+        }
+
+        clearError();
+        setLoading(true, 'Loading selected item detail...');
+        Array.prototype.forEach.call(document.querySelectorAll('.card.selected'), function(card) {
+          card.classList.remove('selected');
+        });
+        selectedCard.classList.add('selected');
+        state.selectedMasterId = masterId;
+
+        google.script.run
+          .withSuccessHandler(handleSelectionSuccess)
+          .withFailureHandler(handleServerFailure)
+          .webAppGetSelectedItemDetail(masterId, state.sessionId);
+      }
+
+      function handleSelectionSuccess(response) {
+        setLoading(false, '');
+        if (!response || !response.ok) {
+          showError(getErrorMessage(response, 'Unable to load selected item.'));
+          return;
+        }
+        renderSelectedDetail((response.data || {}).selected_item || {});
+      }
+
+      function renderSelectedDetail(item) {
+        detailPanel.hidden = false;
+        detailEl.innerHTML = '';
+        detailEl.appendChild(createFieldGrid([
+          ['item_name', item.item_name],
+          ['unit', item.unit],
+          ['material_cost', item.material_cost],
+          ['labor_cost', item.labor_cost],
+          ['total_cost', item.total_cost],
+          ['price_basis', item.price_basis],
+          ['note', item.note || '-'],
+          ['needs_review', item.needs_review || '-'],
+          ['effective_year', item.effective_year || '-'],
+          ['effective_month', item.effective_month || '-']
+        ]));
+      }
+
+      function createFieldGrid(fields) {
+        var grid = document.createElement('div');
+        grid.className = 'field-grid';
+        fields.forEach(function(field) {
+          var item = document.createElement('div');
+          item.innerHTML = '<span class="field-label">' + escapeHtml(field[0]) + '</span>' +
+            '<span class="field-value">' + escapeHtml(valueOrDash(field[1])) + '</span>';
+          grid.appendChild(item);
+        });
+        return grid;
+      }
+
+      function clearSelection() {
+        state.selectedMasterId = '';
+        detailPanel.hidden = true;
+        detailEl.innerHTML = '';
+      }
+
+      function setLoading(isLoading, message) {
+        searchButton.disabled = isLoading;
+        statusEl.className = 'status';
+        statusEl.textContent = message || '';
+      }
+
+      function showError(message) {
+        statusEl.className = 'status error';
+        statusEl.textContent = message;
+      }
+
+      function clearError() {
+        statusEl.className = 'status';
+        statusEl.textContent = '';
+      }
+
+      function handleServerFailure(error) {
+        setLoading(false, '');
+        showError(error && error.message ? error.message : 'Server error.');
+      }
+
+      function getErrorMessage(response, fallback) {
+        if (response && response.error && response.error.message) {
+          return response.error.message;
+        }
+        return fallback;
+      }
+
+      function valueOrDash(value) {
+        return value === null || value === undefined || value === '' ? '-' : String(value);
+      }
+
+      function escapeHtml(value) {
+        return valueOrDash(value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+    </script>
+  </body>
+</html>

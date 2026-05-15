@@ -277,3 +277,64 @@ function runMilestone10SearchEngineSmokeTest() {
 function testSearchCement() {
   return searchMasterPriceDatabase('ปูนซีเมนต์', { triggered_by: 'manual' });
 }
+
+/**
+ * Static smoke test for Milestone 11 WebApp result-card and read-only detail contracts.
+ * This does not mutate sheets; selection logging is covered by the WebApp endpoint path.
+ */
+function runMilestone11WebAppContractSmokeTest() {
+  var unsafeCard = {
+    master_id: 'MST-1',
+    item_name: 'ปูนซีเมนต์',
+    unit: 'ถุง',
+    material_cost: '120',
+    labor_cost: '',
+    total_cost: '120',
+    price_basis: 'material_only',
+    note: 'sample',
+    match_score: 95,
+    needs_review: '',
+    source_name: 'materialcost_tpso',
+    source_type: 'material',
+    match_reason: 'hidden internal reason'
+  };
+  var sanitizedCard = sanitizeSearchResultCardsForWebApp_([unsafeCard])[0];
+  var selectedDetail = toSelectedItemReadOnlyDetail_({
+    master_id: 'MST-1',
+    item_name_original: 'ปูนซีเมนต์ต้นฉบับ',
+    item_name_clean: 'ปูนซีเมนต์',
+    unit: 'ถุง',
+    material_cost: '120',
+    labor_cost: '',
+    total_cost: '120',
+    price_basis: 'material_only',
+    note: 'sample',
+    data_status: 'active',
+    effective_year: '2569',
+    effective_month: '4',
+    source_name: 'materialcost_tpso',
+    source_type: 'material'
+  });
+
+  var hiddenFields = ['source_name', 'source_type', 'match_reason'];
+  var hiddenFieldsPresent = hiddenFields.filter(function(fieldName) {
+    return Object.prototype.hasOwnProperty.call(sanitizedCard, fieldName) || Object.prototype.hasOwnProperty.call(selectedDetail, fieldName);
+  });
+
+  if (hiddenFieldsPresent.length) {
+    return failResult_(createError_('webapp_hidden_fields_exposed', 'WebApp card/detail exposes hidden fields.', { fields: hiddenFieldsPresent }, 'critical'));
+  }
+
+  if (selectedDetail.read_only !== true) {
+    return failResult_(createError_('webapp_detail_not_read_only', 'Selected item detail must be read-only.', {}, 'critical'));
+  }
+
+  return okResult_({
+    sanitized_card: sanitizedCard,
+    selected_detail: selectedDetail,
+    hidden_fields_present: hiddenFieldsPresent,
+    manual_selection_required: true,
+    selected_detail_read_only: selectedDetail.read_only === true,
+    webapp_write_boundary: [PHASE1_SHEETS.SEARCH_LOG]
+  });
+}
