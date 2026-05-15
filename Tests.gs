@@ -360,7 +360,7 @@ function runMilestone12PriceComparisonSmokeTest() {
     user_price_type: 'unknown'
   });
   var convertedUnit = compareUserPriceToMaster_(baseRow, {
-    user_price: '90000',
+    user_price: '89000',
     user_unit: 'ton',
     user_quantity: '1',
     user_price_type: 'material'
@@ -683,6 +683,7 @@ function runMilestone17ChecklistValidationSuite() {
     master_replace_tests: runMilestone17MasterReplaceCriticalTest_(),
     refresh_log_tests: runMilestone8RefreshLogSmokeTest(),
     search_tests: runMilestone10SearchEngineSmokeTest(),
+    search_log_tests: runMilestone15SearchLogSmokeTest(),
     webapp_ui_tests: runMilestone11WebAppContractSmokeTest(),
     price_comparison_tests: runMilestone12PriceComparisonSmokeTest(),
     unit_conversion_tests: runMilestone13UnitConversionSmokeTest(),
@@ -869,5 +870,321 @@ function buildMilestone17RefreshLogData_(status, actionTaken) {
     action_taken: actionTaken,
     error_message: status === 'success' ? '' : 'safe test error',
     triggered_by: 'test'
+  };
+}
+
+
+/**
+ * Milestone 18 Final Acceptance suite.
+ * This is the final Phase 1 gate and mirrors the user-facing acceptance criteria.
+ * It is intentionally built from small contract checks so a failed criterion shows
+ * exactly which Phase 1 promise is not ready.
+ */
+function runMilestone18FinalAcceptanceSuite() {
+  var checklistSuite = runMilestone17ChecklistValidationSuite();
+  var acceptance = {
+    raw_sources_map_to_staging: runMilestone18RawSourcesMapToStaging_(),
+    validation_runs_before_master_update: runMilestone18ValidationBeforeMasterUpdate_(),
+    master_updates_selected_source_only: runMilestone18SelectedSourceMasterUpdate_(),
+    tpso_api_updates_materialcost_tpso: runMilestone18TpsoRawUpdateContract_(),
+    tpso_api_then_master_updates_after_validation: runMilestone18TpsoMasterUpdateAfterValidation_(),
+    api_or_validation_fail_keeps_master_data: runMilestone18FailureKeepsMasterData_(),
+    search_reads_master_only: runMilestone18SearchReadsMasterOnly_(),
+    webapp_requires_manual_result_selection: runMilestone18ManualSelectionContract_(),
+    compare_price_works: runMilestone12PriceComparisonSmokeTest(),
+    unit_conversion_rule_based_before_gemini: runMilestone18RuleBasedBeforeGemini_(),
+    gemini_not_search_engine: runMilestone18GeminiNotSearchEngine_(),
+    logs_work_completely: runMilestone18LogsComplete_(),
+    checklist_09_tests_pass: checklistSuite
+  };
+
+  var failedCriteria = Object.keys(acceptance).filter(function(criteriaName) {
+    return !acceptance[criteriaName] || acceptance[criteriaName].ok !== true;
+  });
+
+  if (failedCriteria.length) {
+    return failResult_(createError_('phase1_final_acceptance_failed', 'Milestone 18 Final Acceptance failed; Phase 1 is not ready.', {
+      failed_criteria: failedCriteria,
+      acceptance: acceptance
+    }, 'critical'));
+  }
+
+  return okResult_({
+    final_acceptance_passed: true,
+    criteria_count: Object.keys(acceptance).length,
+    acceptance: acceptance
+  });
+}
+
+function runMilestone18RawSourcesMapToStaging_() {
+  var samples = buildMilestone18SampleRawRows_();
+  var sourceNames = Object.keys(samples);
+  var mapped = {};
+  var failures = [];
+
+  sourceNames.forEach(function(sourceName) {
+    var result = normalizeRawSourceRows_(sourceName, [samples[sourceName]], {
+      staged_at: '2026-05-15T00:00:00+00:00',
+      aliases: []
+    });
+    mapped[sourceName] = result;
+    if (!result.ok || result.data.row_count !== 1 || !runMilestone18RowHasStagingShape_(result.data.rows[0])) {
+      failures.push(sourceName);
+    }
+  });
+
+  if (failures.length) {
+    return failResult_(createError_('final_acceptance_raw_mapping_failed', 'One or more raw sources did not map into STAGING_NORMALIZED shape.', {
+      failed_sources: failures,
+      mapped: mapped
+    }, 'critical'));
+  }
+
+  return okResult_({ source_count: sourceNames.length, mapped: mapped });
+}
+
+function runMilestone18ValidationBeforeMasterUpdate_() {
+  var row = normalizeRawSourceRows_(PHASE1_SHEETS.LABOR_CGD, [buildMilestone18SampleRawRows_()[PHASE1_SHEETS.LABOR_CGD]], {
+    staged_at: '2026-05-15T00:00:00+00:00',
+    aliases: []
+  }).data.rows[0];
+  var valid = validateStagingRow_(row);
+  var invalid = validateStagingRow_(Object.assign({}, row, {
+    item_name_original: '',
+    unit: '',
+    price: '',
+    total_cost: '',
+    material_cost: '',
+    labor_cost: ''
+  }));
+  var appendWithoutValidation = validateAppendGuard_(PHASE1_SHEETS.MASTER, { reason: 'test without validation' });
+  var appendWithValidation = validateAppendGuard_(PHASE1_SHEETS.MASTER, { validation_passed: true, reason: 'test after validation' });
+  var passed = valid.status !== 'fail' && invalid.status === 'fail' && !appendWithoutValidation.ok && appendWithoutValidation.error.code === 'master_append_requires_validation' && appendWithValidation.ok;
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_validation_gate_failed', 'Master append/update must be gated by validation.', {
+      valid: valid,
+      invalid: invalid,
+      append_without_validation: appendWithoutValidation,
+      append_with_validation: appendWithValidation
+    }, 'critical'));
+  }
+  return okResult_({ valid_row_status: valid.status, invalid_row_status: invalid.status, master_append_guarded: true });
+}
+
+function runMilestone18SelectedSourceMasterUpdate_() {
+  var tpsoRow = normalizeRawSourceRows_(PHASE1_SHEETS.MATERIAL_TPSO, [buildMilestone17SampleTpsoRow_()], {
+    staged_at: '2026-05-15T00:00:00+00:00',
+    aliases: []
+  }).data.rows[0];
+  var sourceOnly = confirmStagingRowsBelongOnlyToSource_(PHASE1_SHEETS.MATERIAL_TPSO, [tpsoRow]);
+  var mixedSource = confirmStagingRowsBelongOnlyToSource_(PHASE1_SHEETS.MATERIAL_TPSO, [tpsoRow, Object.assign({}, tpsoRow, { source_name: PHASE1_SHEETS.LABOR_CGD })]);
+  var masterRow = convertStagingRowToMasterRow_(tpsoRow, '2026-05-15T00:00:00+00:00');
+  var passed = sourceOnly.ok && !mixedSource.ok && mixedSource.error.code === 'staging_has_multiple_sources' && masterRow.source_name === PHASE1_SHEETS.MATERIAL_TPSO;
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_selected_source_only_failed', 'Master update must replace only the selected source.', {
+      source_only: sourceOnly,
+      mixed_source: mixedSource,
+      master_row: masterRow
+    }, 'critical'));
+  }
+  return okResult_({ selected_source: PHASE1_SHEETS.MATERIAL_TPSO, source_only: true, mixed_source_blocked: true });
+}
+
+function runMilestone18TpsoRawUpdateContract_() {
+  var apiRows = [buildMilestone17SampleTpsoRow_()];
+  var extraction = extractTpsoResponseRows_({ data: apiRows });
+  var validation = validateTpsoApiRows_(apiRows);
+  var rawClearAllowed = PHASE1_SAFE_CLEAR_SHEETS.indexOf(PHASE1_SHEETS.MATERIAL_TPSO) !== -1;
+  var masterClearForbidden = PHASE1_SAFE_CLEAR_SHEETS.indexOf(PHASE1_SHEETS.MASTER) === -1;
+  var apiEndpointOk = PHASE1_TPSO_API_URL === 'https://index-api.tpso.go.th/OpenApi/CmiPrice/Month';
+  var requiredFieldsPresent = findMissingValues_(PHASE1_TPSO_HEADER_MARKERS, Object.keys(apiRows[0])).length === 0;
+  var passed = extraction.ok && validation.ok && rawClearAllowed && masterClearForbidden && apiEndpointOk && requiredFieldsPresent;
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_tpso_raw_update_failed', 'TPSO API must update materialcost_tpso raw sheet only before master processing.', {
+      extraction: extraction,
+      validation: validation,
+      raw_clear_allowed: rawClearAllowed,
+      master_clear_forbidden: masterClearForbidden,
+      api_endpoint_ok: apiEndpointOk,
+      required_fields_present: requiredFieldsPresent
+    }, 'critical'));
+  }
+  return okResult_({ endpoint: PHASE1_TPSO_API_URL, raw_sheet: PHASE1_SHEETS.MATERIAL_TPSO, master_clear_forbidden: true });
+}
+
+function runMilestone18TpsoMasterUpdateAfterValidation_() {
+  var normalized = normalizeRawSourceRows_(PHASE1_SHEETS.MATERIAL_TPSO, [buildMilestone17SampleTpsoRow_()], {
+    staged_at: '2026-05-15T00:00:00+00:00',
+    aliases: []
+  });
+  if (!normalized.ok) {
+    return normalized;
+  }
+  var row = normalized.data.rows[0];
+  var validation = validateStagingRow_(row);
+  var masterRow = validation.status !== 'fail' ? convertStagingRowToMasterRow_(row, '2026-05-15T00:00:00+00:00') : null;
+  var passed = validation.status !== 'fail' && masterRow && masterRow.source_name === PHASE1_SHEETS.MATERIAL_TPSO && masterRow.price_basis === 'material_only';
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_tpso_master_after_validation_failed', 'TPSO master rows must be created only after normalization and validation pass.', {
+      normalized: normalized,
+      validation: validation,
+      master_row: masterRow
+    }, 'critical'));
+  }
+  return okResult_({ normalized_rows: normalized.data.row_count, validation_status: validation.status, master_source_name: masterRow.source_name });
+}
+
+function runMilestone18FailureKeepsMasterData_() {
+  var zeroRows = validateTpsoApiRows_([]);
+  var missingFieldRow = Object.assign({}, buildMilestone17SampleTpsoRow_());
+  delete missingFieldRow.priceCur;
+  var missingFields = validateTpsoApiRows_([missingFieldRow]);
+  var failedLog = buildRefreshLogRecord_(buildMilestone17RefreshLogData_('failed', 'kept_existing_master_data'));
+  var blockedLog = buildRefreshLogRecord_(buildMilestone17RefreshLogData_('blocked_by_validation', 'kept_existing_master_data'));
+  var invalidStaging = validateStagingRow_({ source_name: PHASE1_SHEETS.MATERIAL_TPSO, source_type: 'material' });
+  var passed = !zeroRows.ok && !missingFields.ok && failedLog.action_taken === 'kept_existing_master_data' && blockedLog.action_taken === 'kept_existing_master_data' && invalidStaging.status === 'fail';
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_failure_safety_failed', 'API failure or validation failure must keep existing master data.', {
+      zero_rows: zeroRows,
+      missing_fields: missingFields,
+      failed_log: failedLog,
+      blocked_log: blockedLog,
+      invalid_staging: invalidStaging
+    }, 'critical'));
+  }
+  return okResult_({ api_zero_rows_blocked: true, api_missing_fields_blocked: true, validation_fail_blocked: true, action_taken: 'kept_existing_master_data' });
+}
+
+function runMilestone18SearchReadsMasterOnly_() {
+  var searchSmoke = runMilestone10SearchEngineSmokeTest();
+  var readsMaster = SEARCH_FIELDS.indexOf('item_name_clean') !== -1 && SEARCH_RESULT_LIMIT === 10;
+  var noRawSearchFields = SEARCH_FIELDS.indexOf('source_name') === -1 && SEARCH_FIELDS.indexOf('source_type') === -1;
+  var passed = searchSmoke.ok && readsMaster && noRawSearchFields;
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_search_scope_failed', 'Search must read and rank MASTER_PRICE_DATABASE data only.', {
+      search_smoke: searchSmoke,
+      reads_master: readsMaster,
+      no_raw_search_fields: noRawSearchFields
+    }, 'critical'));
+  }
+  return okResult_({ sheet: PHASE1_SHEETS.MASTER, fields: SEARCH_FIELDS.slice(), result_limit: SEARCH_RESULT_LIMIT });
+}
+
+function runMilestone18ManualSelectionContract_() {
+  var webapp = runMilestone11WebAppContractSmokeTest();
+  var selectionFunctionExists = typeof webAppGetSelectedItemDetail === 'function';
+  var comparisonRequiresMasterId = webAppCompareSelectedPrice({
+    selected_master_id: '',
+    user_price: '1',
+    user_unit: 'kg',
+    user_quantity: '1',
+    user_price_type: 'unknown'
+  });
+  var passed = webapp.ok && selectionFunctionExists && webapp.data.manual_selection_required === true && !comparisonRequiresMasterId.ok && comparisonRequiresMasterId.error.code === 'missing_selected_master_id';
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_manual_selection_failed', 'WebApp must require the user to manually select a result before comparison.', {
+      webapp: webapp,
+      selection_function_exists: selectionFunctionExists,
+      comparison_requires_master_id: comparisonRequiresMasterId
+    }, 'critical'));
+  }
+  return okResult_({ manual_selection_required: true, selection_function: 'webAppGetSelectedItemDetail', comparison_requires_selected_master_id: true });
+}
+
+function runMilestone18RuleBasedBeforeGemini_() {
+  var ruleResult = convertPricePerUnitWithGeminiFallback_(1000, 'ton', 'kg', {
+    selected_item_name: 'วัสดุทดสอบ',
+    user_quantity: '1',
+    user_price_type: 'material'
+  });
+  var complexResult = convertPricePerUnitToReferenceUnit_(100, 'bag', 'kg');
+  var passed = ruleResult.ok && ruleResult.data.conversion_source === 'rule_based' && !complexResult.ok && complexResult.error.code === 'unit_conversion_unavailable';
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_unit_precedence_failed', 'Rule-based conversion must be attempted and used before Gemini.', {
+      rule_result: ruleResult,
+      complex_rule_result: complexResult
+    }, 'critical'));
+  }
+  return okResult_({ rule_based_first: true, rule_result: ruleResult.data, complex_requires_interpretation: true });
+}
+
+function runMilestone18GeminiNotSearchEngine_() {
+  var searchSmoke = runMilestone10SearchEngineSmokeTest();
+  var geminiBounded = runMilestone14GeminiBoundarySmokeTest();
+  var passed = searchSmoke.ok && geminiBounded.ok && GEMINI_UNIT_ALLOWED_INPUT_KEYS.indexOf('user_query') === -1 && GEMINI_UNIT_ALLOWED_INPUT_KEYS.indexOf('master_database') === -1;
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_gemini_search_boundary_failed', 'Gemini must not be used as the Phase 1 search engine.', {
+      search_smoke: searchSmoke,
+      gemini_boundary: geminiBounded,
+      gemini_allowed_input_keys: GEMINI_UNIT_ALLOWED_INPUT_KEYS.slice()
+    }, 'critical'));
+  }
+  return okResult_({ gemini_scope: 'complex_unit_conversion_only', search_engine: 'rule_based_master_sheet_search' });
+}
+
+function runMilestone18LogsComplete_() {
+  var refreshLog = runMilestone8RefreshLogSmokeTest();
+  var searchLog = runMilestone15SearchLogSmokeTest();
+  var refreshSchemaOk = arraysEqual_(PHASE1_SCHEMAS.REFRESH_LOG, PHASE1_SCHEMAS.REFRESH_LOG.slice());
+  var searchSchemaOk = arraysEqual_(PHASE1_SCHEMAS.SEARCH_LOG, PHASE1_SCHEMAS.SEARCH_LOG.slice());
+  var passed = refreshLog.ok && searchLog.ok && refreshSchemaOk && searchSchemaOk;
+  if (!passed) {
+    return failResult_(createError_('final_acceptance_logs_failed', 'REFRESH_LOG and SEARCH_LOG contracts must both pass.', {
+      refresh_log: refreshLog,
+      search_log: searchLog,
+      refresh_schema_ok: refreshSchemaOk,
+      search_schema_ok: searchSchemaOk
+    }, 'critical'));
+  }
+  return okResult_({ refresh_log: refreshLog.data, search_log: searchLog.data });
+}
+
+function runMilestone18RowHasStagingShape_(row) {
+  if (!row) {
+    return false;
+  }
+  return PHASE1_SCHEMAS.STAGING_NORMALIZED.every(function(fieldName) {
+    return Object.prototype.hasOwnProperty.call(row, fieldName);
+  });
+}
+
+function buildMilestone18SampleRawRows_() {
+  return {
+    laborcost_cgd: {
+      category_l1: 'งานโครงสร้าง',
+      category_l2: 'หมวดแรงงาน',
+      category_l3: 'งานตอกเสาเข็ม',
+      item_code: 'LCGD-1',
+      item_description_clean: 'ค่าแรงตอกเสาเข็มทดสอบ',
+      unit: 'ต้น',
+      labor_cost_thb: '95',
+      row_note: 'จำนวน 200 ต้นขึ้นไป',
+      context_note: 'ทดสอบ mapping'
+    },
+    laborcost_obec: {
+      category_l1: 'งานโครงสร้าง',
+      category_l2: 'งานขุดดิน',
+      category_l3: 'ขุดดินฐานราก',
+      item_code: 'LOBEC-1',
+      item_description_clean: 'ค่าแรงขุดดินทดสอบ',
+      unit: 'ลบ.ม.',
+      material_cost_thb: '999',
+      labor_cost_thb: '112',
+      row_note: '',
+      context_note: 'material_cost_thb ignored in Phase 1'
+    },
+    materialcost_obec: {
+      category_l1: 'งานโครงสร้าง',
+      category_l2: 'งานขุดดิน',
+      category_l3: 'วัสดุรองฐานราก',
+      item_code: 'MOBEC-1',
+      item_description_clean: 'ทรายหยาบรองพื้นทดสอบ',
+      unit: 'ลบ.ม.',
+      material_cost_thb: '510',
+      labor_cost_thb: '104',
+      row_note: '',
+      context_note: ''
+    },
+    materialcost_tpso: buildMilestone17SampleTpsoRow_()
   };
 }

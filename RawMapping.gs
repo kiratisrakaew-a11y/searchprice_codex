@@ -5,7 +5,7 @@ const PHASE1_RAW_MAPPING_CONFIG = Object.freeze({
   laborcost_cgd: Object.freeze({
     source_name: 'laborcost_cgd',
     source_type: 'labor',
-    update_frequency: 'yearly',
+    update_frequency: 'yearly/manual',
     price_basis: 'labor_only',
     header_row: 1,
     data_start_row: 2,
@@ -24,7 +24,7 @@ const PHASE1_RAW_MAPPING_CONFIG = Object.freeze({
   laborcost_obec: Object.freeze({
     source_name: 'laborcost_obec',
     source_type: 'labor',
-    update_frequency: 'yearly',
+    update_frequency: 'yearly/manual',
     price_basis: 'labor_only',
     header_row: 1,
     data_start_row: 2,
@@ -44,7 +44,7 @@ const PHASE1_RAW_MAPPING_CONFIG = Object.freeze({
   materialcost_obec: Object.freeze({
     source_name: 'materialcost_obec',
     source_type: 'material_labor',
-    update_frequency: 'yearly',
+    update_frequency: 'yearly/manual',
     price_basis: 'material_plus_labor',
     header_row: 1,
     data_start_row: 2,
@@ -64,7 +64,7 @@ const PHASE1_RAW_MAPPING_CONFIG = Object.freeze({
   materialcost_tpso: Object.freeze({
     source_name: 'materialcost_tpso',
     source_type: 'material',
-    update_frequency: 'monthly',
+    update_frequency: 'monthly/API',
     price_basis: 'material_only',
     required_headers: Object.freeze([
       'commodityCode',
