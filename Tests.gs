@@ -29,3 +29,51 @@ function runMilestone2CoreUtilitySmokeTest() {
     }
   });
 }
+
+
+/**
+ * Static smoke test for Milestone 3 raw mapping without mutating sheets.
+ */
+function runMilestone3RawMappingSmokeTest() {
+  var laborResult = mapRawRowToCommonSchema_(PHASE1_SHEETS.LABOR_CGD, {
+    category_l1: 'งานโครงสร้าง',
+    category_l2: 'หมวดแรงงาน',
+    category_l3: '',
+    item_code: 'L001',
+    item_description_clean: 'ทดสอบแรงงาน',
+    unit: 'งาน',
+    labor_cost_thb: '1,200',
+    row_note: 'note A',
+    context_note: 'note B'
+  });
+
+  var materialResult = mapRawRowToCommonSchema_(PHASE1_SHEETS.MATERIAL_OBEC, {
+    category_l1: 'งานวัสดุ',
+    category_l2: 'หมวดวัสดุ',
+    category_l3: '',
+    item_code: 'M001',
+    item_description_clean: 'ทดสอบวัสดุ',
+    unit: 'ชุด',
+    material_cost_thb: '700',
+    labor_cost_thb: '300',
+    row_note: 'material note',
+    context_note: ''
+  });
+
+  var tpsoResult = mapRawRowToCommonSchema_(PHASE1_SHEETS.MATERIAL_TPSO, {
+    commodityCode: 'T001',
+    commodityNameTH: 'วัสดุ TPSO',
+    unitName: 'หน่วย',
+    priceCur: '450.50',
+    curYear: '2569',
+    curMonth: '4',
+    typeName: 'ส่วนกลาง',
+    createdAt: '2026-05-12T00:00:00Z'
+  });
+
+  return okResult_({
+    labor: laborResult,
+    material: materialResult,
+    tpso: tpsoResult
+  });
+}

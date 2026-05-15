@@ -129,7 +129,6 @@ const PHASE1_RAW_HEADERS = Object.freeze({
     'item_code',
     'item_description_clean',
     'unit',
-    'material_cost_thb',
     'labor_cost_thb',
     'row_note',
     'context_note'
