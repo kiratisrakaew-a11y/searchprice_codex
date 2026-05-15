@@ -122,3 +122,28 @@ function sanitizeSearchResultCardsForWebApp_(cards) {
     }, {});
   });
 }
+
+/**
+ * Compares user-entered price against the manually selected master row.
+ * This is read-only: it does not write COMPARISON_LOG or any source/staging/master sheet.
+ */
+function webAppCompareSelectedPrice(payload) {
+  var input = payload || {};
+  var masterId = cleanDisplayText_(input.selected_master_id);
+  if (!masterId) {
+    return failResult_(createError_('missing_selected_master_id', 'Please select a search result before comparing.', {}, 'warning'));
+  }
+
+  var rowResult = findMasterRowById_(masterId);
+  if (!rowResult.ok) {
+    return rowResult;
+  }
+
+  return compareUserPriceToMaster_(rowResult.data.row, {
+    user_price: input.user_price,
+    user_unit: input.user_unit,
+    user_quantity: input.user_quantity,
+    user_price_type: input.user_price_type || 'unknown',
+    user_note: input.user_note
+  });
+}

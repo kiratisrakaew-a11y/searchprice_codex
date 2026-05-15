@@ -338,3 +338,64 @@ function runMilestone11WebAppContractSmokeTest() {
     webapp_write_boundary: [PHASE1_SHEETS.SEARCH_LOG]
   });
 }
+
+/**
+ * Static smoke test for Milestone 12 price comparison without mutating sheets.
+ */
+function runMilestone12PriceComparisonSmokeTest() {
+  var baseRow = {
+    master_id: 'MST-COMPARE-1',
+    item_name_clean: 'ปูนซีเมนต์',
+    unit: 'kg',
+    material_cost: '100',
+    labor_cost: '',
+    total_cost: '100',
+    price: '100'
+  };
+
+  var sameUnit = compareUserPriceToMaster_(baseRow, {
+    user_price: '105',
+    user_unit: 'kg',
+    user_quantity: '1',
+    user_price_type: 'unknown'
+  });
+  var convertedUnit = compareUserPriceToMaster_(baseRow, {
+    user_price: '90000',
+    user_unit: 'ton',
+    user_quantity: '1',
+    user_price_type: 'material'
+  });
+  var cannotConvert = compareUserPriceToMaster_(baseRow, {
+    user_price: '120',
+    user_unit: 'bag',
+    user_quantity: '1',
+    user_price_type: 'material'
+  });
+  var referenceSelection = selectReferencePrice_({
+    material_cost: '10',
+    labor_cost: '20',
+    total_cost: '30',
+    price: '40'
+  }, 'unknown');
+
+  if (!sameUnit.ok || sameUnit.data.result !== COMPARISON_CLASSIFICATIONS.CLOSE) {
+    return failResult_(createError_('comparison_same_unit_failed', 'Same-unit comparison did not classify as close_to_reference.', { result: sameUnit }, 'critical'));
+  }
+  if (!convertedUnit.ok || convertedUnit.data.result !== COMPARISON_CLASSIFICATIONS.LOWER || convertedUnit.data.conversion_status !== 'converted') {
+    return failResult_(createError_('comparison_conversion_failed', 'Converted-unit comparison did not use rule-based conversion correctly.', { result: convertedUnit }, 'critical'));
+  }
+  if (!cannotConvert.ok || cannotConvert.data.result !== COMPARISON_CLASSIFICATIONS.CANNOT || cannotConvert.data.variance_percent !== '') {
+    return failResult_(createError_('comparison_cannot_convert_failed', 'Unconvertible units must return cannot_compare without variance judgment.', { result: cannotConvert }, 'critical'));
+  }
+  if (!referenceSelection.ok || referenceSelection.data.reference_price_field !== 'total_cost') {
+    return failResult_(createError_('comparison_reference_selection_failed', 'unknown price type must select total_cost before price fallback.', { result: referenceSelection }, 'critical'));
+  }
+
+  return okResult_({
+    same_unit: sameUnit.data,
+    converted_unit: convertedUnit.data,
+    cannot_convert: cannotConvert.data,
+    reference_selection: referenceSelection.data,
+    writes_performed: []
+  });
+}

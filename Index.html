@@ -47,13 +47,29 @@
         align-items: stretch;
       }
 
+      input[type="search"],
+      input[type="number"],
+      input[type="text"],
+      select,
+      textarea {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-sizing: border-box;
+        font: inherit;
+        padding: 10px;
+        width: 100%;
+      }
+
       input[type="search"] {
         flex: 1;
         min-width: 0;
-        border: 1px solid var(--border);
-        border-radius: 8px;
         font-size: 16px;
         padding: 12px;
+      }
+
+      textarea {
+        margin: 8px 0 12px;
+        resize: vertical;
       }
 
       button {
@@ -141,6 +157,23 @@
         padding: 3px 8px;
       }
 
+      .comparison-form {
+        display: grid;
+        gap: 12px;
+      }
+
+      .classification {
+        border-radius: 8px;
+        font-weight: 700;
+        margin-bottom: 12px;
+        padding: 10px;
+      }
+
+      .classification.close_to_reference { background: #e6f4ea; color: #137333; }
+      .classification.higher_than_reference { background: #fef7e0; color: #b06000; }
+      .classification.lower_than_reference { background: #e8f0fe; color: #174ea6; }
+      .classification.cannot_compare { background: #fce8e6; color: #b3261e; }
+
       @media (max-width: 640px) {
         main {
           padding: 14px;
@@ -175,6 +208,42 @@
         <p class="muted">This detail view is populated only after you click Select on a result card. It does not edit source, staging, master, or alias sheets.</p>
         <div id="detail" class="detail-grid"></div>
       </section>
+
+      <section id="comparison-panel" class="panel" hidden>
+        <h2>Price Comparison</h2>
+        <p class="muted">Enter your price details after manually selecting a result. Comparison is read-only and does not approve, reject, or update any database price.</p>
+        <form id="comparison-form" class="comparison-form">
+          <div class="field-grid">
+            <label>
+              <span class="field-label">user_price *</span>
+              <input id="user-price" type="number" min="0" step="0.0001" required>
+            </label>
+            <label>
+              <span class="field-label">user_unit *</span>
+              <input id="user-unit" type="text" required>
+            </label>
+            <label>
+              <span class="field-label">user_quantity *</span>
+              <input id="user-quantity" type="number" min="0.0001" step="0.0001" value="1" required>
+            </label>
+            <label>
+              <span class="field-label">user_price_type *</span>
+              <select id="user-price-type" required>
+                <option value="unknown" selected>unknown</option>
+                <option value="material">material</option>
+                <option value="labor">labor</option>
+                <option value="total">total</option>
+              </select>
+            </label>
+          </div>
+          <label>
+            <span class="field-label">user_note</span>
+            <textarea id="user-note" rows="3" placeholder="Optional note"></textarea>
+          </label>
+          <button id="compare-button" type="submit">Compare Price</button>
+        </form>
+        <div id="comparison-result" class="status" aria-live="polite"></div>
+      </section>
     </main>
 
     <script>
@@ -193,10 +262,24 @@
       var suggestionsEl = document.getElementById('suggestions');
       var detailPanel = document.getElementById('detail-panel');
       var detailEl = document.getElementById('detail');
+      var comparisonPanel = document.getElementById('comparison-panel');
+      var comparisonForm = document.getElementById('comparison-form');
+      var userPriceInput = document.getElementById('user-price');
+      var userUnitInput = document.getElementById('user-unit');
+      var userQuantityInput = document.getElementById('user-quantity');
+      var userPriceTypeInput = document.getElementById('user-price-type');
+      var userNoteInput = document.getElementById('user-note');
+      var compareButton = document.getElementById('compare-button');
+      var comparisonResultEl = document.getElementById('comparison-result');
 
       form.addEventListener('submit', function(event) {
         event.preventDefault();
         runSearch();
+      });
+
+      comparisonForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        runComparison();
       });
 
       function runSearch() {
@@ -329,6 +412,70 @@
           ['effective_year', item.effective_year || '-'],
           ['effective_month', item.effective_month || '-']
         ]));
+        comparisonPanel.hidden = false;
+        userUnitInput.value = item.unit || userUnitInput.value;
+        comparisonResultEl.innerHTML = '';
+      }
+
+      function runComparison() {
+        if (!state.selectedMasterId) {
+          showError('Please select a search result before comparing.');
+          return;
+        }
+
+        clearError();
+        compareButton.disabled = true;
+        comparisonResultEl.className = 'status';
+        comparisonResultEl.textContent = 'Comparing...';
+
+        google.script.run
+          .withSuccessHandler(handleComparisonSuccess)
+          .withFailureHandler(handleComparisonFailure)
+          .webAppCompareSelectedPrice({
+            selected_master_id: state.selectedMasterId,
+            user_price: userPriceInput.value,
+            user_unit: userUnitInput.value,
+            user_quantity: userQuantityInput.value,
+            user_price_type: userPriceTypeInput.value || 'unknown',
+            user_note: userNoteInput.value
+          });
+      }
+
+      function handleComparisonSuccess(response) {
+        compareButton.disabled = false;
+        if (!response || !response.ok) {
+          comparisonResultEl.className = 'status error';
+          comparisonResultEl.textContent = getErrorMessage(response, 'Comparison failed.');
+          return;
+        }
+        renderComparisonResult(response.data || {});
+      }
+
+      function handleComparisonFailure(error) {
+        compareButton.disabled = false;
+        handleServerFailure(error);
+      }
+
+      function renderComparisonResult(result) {
+        comparisonResultEl.className = 'status';
+        comparisonResultEl.innerHTML = '';
+        var classification = document.createElement('div');
+        classification.className = 'classification ' + (result.result || 'cannot_compare');
+        classification.textContent = 'Result: ' + valueOrDash(result.result);
+        comparisonResultEl.appendChild(classification);
+        comparisonResultEl.appendChild(createFieldGrid([
+          ['reference_price', result.reference_price],
+          ['reference_price_field', result.reference_price_field],
+          ['reference_unit', result.reference_unit],
+          ['user_unit_price', result.user_unit_price],
+          ['user_comparable_price', result.user_comparable_price],
+          ['variance_amount', result.variance_amount],
+          ['variance_percent', result.variance_percent],
+          ['conversion_status', result.conversion_status],
+          ['conversion_note', result.conversion_note],
+          ['assumption_used', result.assumption_used || '-'],
+          ['cannot_compare_reason', result.cannot_compare_reason || '-']
+        ]));
       }
 
       function createFieldGrid(fields) {
@@ -347,6 +494,8 @@
         state.selectedMasterId = '';
         detailPanel.hidden = true;
         detailEl.innerHTML = '';
+        comparisonPanel.hidden = true;
+        comparisonResultEl.innerHTML = '';
       }
 
       function setLoading(isLoading, message) {
