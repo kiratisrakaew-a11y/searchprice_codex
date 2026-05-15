@@ -123,3 +123,29 @@ function runMilestone5NormalizeRowsSmokeTest() {
     staged_at: getCurrentTimestamp_()
   });
 }
+
+
+/**
+ * Static smoke test for Milestone 6 staging validation without mutating sheets.
+ */
+function runMilestone6ValidationSmokeTest() {
+  var row = mapRawRowToCommonSchema_(PHASE1_SHEETS.LABOR_CGD, {
+    category_l1: 'งานโครงสร้าง',
+    category_l2: 'หมวดแรงงาน',
+    category_l3: '',
+    item_code: 'L001',
+    item_description_clean: 'ทดสอบแรงงาน',
+    unit: 'งาน',
+    labor_cost_thb: '1,200',
+    row_note: 'note A',
+    context_note: 'note B'
+  }).data.row;
+
+  var validRowResult = validateStagingRow_(row);
+  var invalidRow = Object.assign({}, row, { item_name_original: '', unit: '', price: '', total_cost: '', labor_cost: '' });
+  var invalidRowResult = validateStagingRow_(invalidRow);
+  return okResult_({
+    valid_row: validRowResult,
+    invalid_row: invalidRowResult
+  });
+}

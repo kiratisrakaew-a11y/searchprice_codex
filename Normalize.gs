@@ -191,3 +191,8 @@ function addUniqueAliasTerm_(terms, term) {
     terms.push(cleaned);
   }
 }
+
+
+function validateCurrentStagingForMasterUpdate() {
+  return validateStagingBeforeMasterUpdate('', { triggered_by: 'manual' });
+}

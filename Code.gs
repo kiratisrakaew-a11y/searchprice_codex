@@ -13,6 +13,8 @@ function onOpen() {
     .addItem('Process laborcost_obec to Staging', 'processLaborCostObecToStaging')
     .addItem('Process materialcost_obec to Staging', 'processMaterialCostObecToStaging')
     .addItem('Process materialcost_tpso to Staging', 'processMaterialCostTpsoToStaging')
+    .addSeparator()
+    .addItem('Validate Staging', 'validateCurrentStagingForMasterUpdate')
     .addToUi();
 }
 
