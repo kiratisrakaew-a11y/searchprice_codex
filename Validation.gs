@@ -33,6 +33,15 @@ function validateStagingBeforeMasterUpdate(sourceName, options) {
   }
 
   summary.ready_for_master_update = summary.block_master_update === false;
+
+  // Write per-row validation_status / validation_issues / needs_review back to
+  // STAGING_NORMALIZED so the operator can see results in the sheet immediately
+  // after running Validate Staging, not only after Update Master.
+  if (opts.write_results_to_sheet !== false && rowCount > 0) {
+    var markResult = markStagingValidationResults_(spreadsheet, sourceName || '', summary);
+    summary.staging_marked = markResult.ok ? markResult.data : null;
+  }
+
   return okResult_(summary);
 }
 
