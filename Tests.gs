@@ -102,3 +102,24 @@ function runMilestone4TpsoApiValidationSmokeTest() {
     validate: validateTpsoApiRows_(sampleRows)
   });
 }
+
+
+/**
+ * Static smoke test for Milestone 5 source normalization helpers without mutating sheets.
+ */
+function runMilestone5NormalizeRowsSmokeTest() {
+  return normalizeRawSourceRows_(PHASE1_SHEETS.LABOR_CGD, [{
+    category_l1: 'งานโครงสร้าง',
+    category_l2: 'หมวดแรงงาน',
+    category_l3: '',
+    item_code: 'L001',
+    item_description_clean: 'ทดสอบแรงงาน',
+    unit: 'งาน',
+    labor_cost_thb: '1,200',
+    row_note: 'note A',
+    context_note: 'note B'
+  }], {
+    aliases: [],
+    staged_at: getCurrentTimestamp_()
+  });
+}

@@ -8,6 +8,11 @@ function onOpen() {
     .addItem('Validate Sheet Schema', 'validatePhase1Sheets')
     .addSeparator()
     .addItem('Refresh TPSO API (Manual)', 'refreshTpsoFromApiManual')
+    .addSeparator()
+    .addItem('Process laborcost_cgd to Staging', 'processLaborCostCgdToStaging')
+    .addItem('Process laborcost_obec to Staging', 'processLaborCostObecToStaging')
+    .addItem('Process materialcost_obec to Staging', 'processMaterialCostObecToStaging')
+    .addItem('Process materialcost_tpso to Staging', 'processMaterialCostTpsoToStaging')
     .addToUi();
 }
 

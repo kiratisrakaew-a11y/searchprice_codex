@@ -119,6 +119,7 @@ function normalizeRawSourceSheet_(sourceName, options) {
   return normalizeRawSourceRows_(sourceName, readResult.data.rows, {
     header_map: readResult.data.header_map,
     staged_at: opts.staged_at,
+    aliases: opts.aliases || [],
     skip_blank_rows: opts.skip_blank_rows !== false
   });
 }
@@ -144,6 +145,7 @@ function normalizeRawSourceRows_(sourceName, rawRows, options) {
 
     var rowResult = mapRawRowToCommonSchema_(sourceName, rawRow, {
       staged_at: opts.staged_at,
+      aliases: opts.aliases || [],
       row_index: rowIndex
     });
     if (rowResult.ok) {
@@ -242,6 +244,7 @@ function mapLaborCostRow_(config, rawRow, options) {
   var note = combineNotes_(rawRow.row_note, rawRow.context_note);
 
   return buildStagingRecord_({
+    aliases: options.aliases || [],
     source_name: config.source_name,
     source_type: config.source_type,
     update_frequency: config.update_frequency,
@@ -274,6 +277,7 @@ function mapMaterialObecRow_(config, rawRow, options) {
   var note = combineNotes_(rawRow.row_note, rawRow.context_note);
 
   return buildStagingRecord_({
+    aliases: options.aliases || [],
     source_name: config.source_name,
     source_type: config.source_type,
     update_frequency: config.update_frequency,
@@ -304,6 +308,7 @@ function mapTpsoRow_(config, rawRow, options) {
   var createdAtNote = cleanDisplayText_(rawRow.createdAt);
 
   return buildStagingRecord_({
+    aliases: options.aliases || [],
     source_name: config.source_name,
     source_type: config.source_type,
     update_frequency: config.update_frequency,
@@ -354,13 +359,14 @@ function buildStagingRecord_(values) {
     search_keywords: '',
     alias_terms: '',
     normalized_text: '',
-    validation_status: '',
+    validation_status: 'pending',
     validation_issues: '',
-    needs_review: '',
+    needs_review: 'no',
     review_note: '',
     staged_at: values.staged_at
   };
 
+  record.alias_terms = buildAliasTermsForRecord_(record, values.aliases || []);
   record.search_keywords = buildSearchKeywords_(record);
   record.normalized_text = buildNormalizedText_(record);
   return record;
