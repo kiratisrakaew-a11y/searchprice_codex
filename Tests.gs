@@ -616,3 +616,53 @@ function runMilestone15SearchLogSmokeTest() {
     required_fields: PHASE1_SCHEMAS.SEARCH_LOG.slice()
   });
 }
+
+/**
+ * Static smoke test for Milestone 16 admin custom menu contract without mutating sheets.
+ */
+function runMilestone16AdminMenuSmokeTest() {
+  var expected = [
+    'Refresh TPSO from API',
+    'Process CGD Labor',
+    'Process OBEC Labor',
+    'Process OBEC Material',
+    'Process TPSO Material',
+    'Validate Staging',
+    'Update Master for Selected Source',
+    'View Last Refresh Status',
+    'Run Phase 1 Test Checks'
+  ];
+  var missingItems = expected.filter(function(item) {
+    return PHASE1_ADMIN_MENU_ITEMS.indexOf(item) === -1;
+  });
+  var extraItems = PHASE1_ADMIN_MENU_ITEMS.filter(function(item) {
+    return expected.indexOf(item) === -1;
+  });
+  var forbiddenMenuItems = PHASE1_ADMIN_MENU_ITEMS.filter(function(item) {
+    return item === 'Refresh TPSO API + Update Master' || item.indexOf('Update Master: ') === 0;
+  });
+
+  if (missingItems.length || extraItems.length || forbiddenMenuItems.length) {
+    return failResult_(createError_('admin_menu_contract_failed', 'Admin menu items must match Milestone 16 exactly.', {
+      missing_items: missingItems,
+      extra_items: extraItems,
+      forbidden_items: forbiddenMenuItems
+    }, 'critical'));
+  }
+
+  return okResult_({
+    menu_items: PHASE1_ADMIN_MENU_ITEMS.slice(),
+    refresh_tpso_raw_only_handler: 'adminRefreshTpsoFromApi',
+    process_handlers: [
+      'adminProcessCgdLabor',
+      'adminProcessObecLabor',
+      'adminProcessObecMaterial',
+      'adminProcessTpsoMaterial'
+    ],
+    update_master_handler: 'adminUpdateMasterForSelectedSource',
+    update_master_requires_selected_source: true,
+    update_master_requires_validation_passed: true,
+    update_master_blocks_on_validation_fail: true,
+    no_combined_tpso_master_update_menu: true
+  });
+}

@@ -1,27 +1,21 @@
 /**
- * Adds a small Phase 1 setup menu for schema initialization and validation.
+ * Adds the Phase 1 admin/manual action menu with safe workflow entrypoints.
  */
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Phase 1 Price DB')
-    .addItem('Setup / Validate Sheets', 'setupPhase1Sheets')
-    .addItem('Validate Sheet Schema', 'validatePhase1Sheets')
-    .addItem('Test Search ปูนซีเมนต์', 'testSearchCement')
+    .addItem('Refresh TPSO from API', 'adminRefreshTpsoFromApi')
     .addSeparator()
-    .addItem('Refresh TPSO API (Manual Raw Only)', 'refreshTpsoFromApiManual')
-    .addItem('Refresh TPSO API + Update Master', 'refreshTpsoApiNormalizeValidateUpdateMasterManual')
+    .addItem('Process CGD Labor', 'adminProcessCgdLabor')
+    .addItem('Process OBEC Labor', 'adminProcessObecLabor')
+    .addItem('Process OBEC Material', 'adminProcessObecMaterial')
+    .addItem('Process TPSO Material', 'adminProcessTpsoMaterial')
     .addSeparator()
-    .addItem('Process laborcost_cgd to Staging', 'processLaborCostCgdToStaging')
-    .addItem('Process laborcost_obec to Staging', 'processLaborCostObecToStaging')
-    .addItem('Process materialcost_obec to Staging', 'processMaterialCostObecToStaging')
-    .addItem('Process materialcost_tpso to Staging', 'processMaterialCostTpsoToStaging')
+    .addItem('Validate Staging', 'adminValidateStaging')
+    .addItem('Update Master for Selected Source', 'adminUpdateMasterForSelectedSource')
     .addSeparator()
-    .addItem('Validate Staging', 'validateCurrentStagingForMasterUpdate')
-    .addSeparator()
-    .addItem('Update Master: laborcost_cgd', 'updateMasterForLaborCostCgd')
-    .addItem('Update Master: laborcost_obec', 'updateMasterForLaborCostObec')
-    .addItem('Update Master: materialcost_obec', 'updateMasterForMaterialCostObec')
-    .addItem('Update Master: materialcost_tpso', 'updateMasterForMaterialCostTpso')
+    .addItem('View Last Refresh Status', 'adminViewLastRefreshStatus')
+    .addItem('Run Phase 1 Test Checks', 'adminRunPhase1TestChecks')
     .addToUi();
 }
 

@@ -70,3 +70,20 @@ const PHASE1_TPSO_HEADER_MARKERS = Object.freeze([
   'priceVAT',
   'createdAt'
 ]);
+
+const PHASE1_ADMIN_SELECTED_SOURCE_PROPERTY = 'PHASE1_ADMIN_SELECTED_SOURCE';
+const PHASE1_ADMIN_VALIDATED_SOURCE_PROPERTY = 'PHASE1_ADMIN_VALIDATED_SOURCE';
+const PHASE1_ADMIN_VALIDATION_PASSED_PROPERTY = 'PHASE1_ADMIN_VALIDATION_PASSED';
+const PHASE1_ADMIN_VALIDATION_AT_PROPERTY = 'PHASE1_ADMIN_VALIDATION_AT';
+
+const PHASE1_ADMIN_MENU_ITEMS = Object.freeze([
+  'Refresh TPSO from API',
+  'Process CGD Labor',
+  'Process OBEC Labor',
+  'Process OBEC Material',
+  'Process TPSO Material',
+  'Validate Staging',
+  'Update Master for Selected Source',
+  'View Last Refresh Status',
+  'Run Phase 1 Test Checks'
+]);
