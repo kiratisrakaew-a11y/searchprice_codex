@@ -32,6 +32,7 @@ function checkRequiredSheets() {
 function createMissingPhase1SchemaSheets() {
   var spreadsheet = getActiveSpreadsheet_();
   var createdSheets = [];
+  var writes = [];
 
   PHASE1_SCHEMA_MANAGED_SHEETS.forEach(function(sheetName) {
     var schema = getExpectedSchema_(sheetName);
@@ -39,10 +40,14 @@ function createMissingPhase1SchemaSheets() {
     if (result.created) {
       createdSheets.push(sheetName);
     }
+    if (result.write) {
+      writes.push(result.write);
+    }
   });
 
   return {
-    created_sheets: createdSheets
+    created_sheets: createdSheets,
+    writes: writes
   };
 }
 
@@ -54,6 +59,7 @@ function setupPhase1Sheets() {
   var creation = createMissingPhase1SchemaSheets();
   var validation = validatePhase1Sheets();
   validation.created_sheets = creation.created_sheets;
+  validation.writes = creation.writes;
   return validation;
 }
 

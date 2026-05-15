@@ -22,15 +22,24 @@ function ensureSheetWithHeader_(spreadsheet, sheetName, headers) {
     created = true;
   }
 
+  var writeRangeA1 = '';
   var existingHeader = getRowValues_(sheet, 1, headers.length);
   if (isBlankRow_(existingHeader)) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    var headerRange = sheet.getRange(1, 1, 1, headers.length);
+    headerRange.setValues([headers]);
+    writeRangeA1 = headerRange.getA1Notation();
     sheet.setFrozenRows(1);
   }
 
   return {
     sheet: sheet,
-    created: created
+    created: created,
+    write: writeRangeA1 ? {
+      sheet_name: sheetName,
+      range_a1: writeRangeA1,
+      rows: 1,
+      columns: headers.length
+    } : null
   };
 }
 
