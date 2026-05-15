@@ -1,0 +1,57 @@
+/**
+ * Phase 1 configuration constants for sheet setup and schema guard.
+ */
+const PHASE1_SHEETS = Object.freeze({
+  LABOR_CGD: 'laborcost_cgd',
+  LABOR_OBEC: 'laborcost_obec',
+  MATERIAL_OBEC: 'materialcost_obec',
+  MATERIAL_TPSO: 'materialcost_tpso',
+  STAGING: 'STAGING_NORMALIZED',
+  MASTER: 'MASTER_PRICE_DATABASE',
+  ALIAS: 'ALIAS_DICTIONARY',
+  REFRESH_LOG: 'REFRESH_LOG',
+  SEARCH_LOG: 'SEARCH_LOG',
+  CHECKLIST: 'CHECKLIST_2_SCHEMA'
+});
+
+const PHASE1_REQUIRED_SHEETS = Object.freeze([
+  PHASE1_SHEETS.LABOR_CGD,
+  PHASE1_SHEETS.LABOR_OBEC,
+  PHASE1_SHEETS.MATERIAL_OBEC,
+  PHASE1_SHEETS.MATERIAL_TPSO,
+  PHASE1_SHEETS.STAGING,
+  PHASE1_SHEETS.MASTER,
+  PHASE1_SHEETS.ALIAS,
+  PHASE1_SHEETS.REFRESH_LOG,
+  PHASE1_SHEETS.SEARCH_LOG,
+  PHASE1_SHEETS.CHECKLIST
+]);
+
+const PHASE1_SCHEMA_MANAGED_SHEETS = Object.freeze([
+  PHASE1_SHEETS.STAGING,
+  PHASE1_SHEETS.MASTER,
+  PHASE1_SHEETS.ALIAS,
+  PHASE1_SHEETS.REFRESH_LOG,
+  PHASE1_SHEETS.SEARCH_LOG
+]);
+
+const PHASE1_RAW_SHEETS = Object.freeze([
+  PHASE1_SHEETS.LABOR_CGD,
+  PHASE1_SHEETS.LABOR_OBEC,
+  PHASE1_SHEETS.MATERIAL_OBEC,
+  PHASE1_SHEETS.MATERIAL_TPSO
+]);
+
+const PHASE1_TPSO_HEADER_MARKERS = Object.freeze([
+  'id',
+  'type',
+  'typeName',
+  'commodityCode',
+  'commodityNameTH',
+  'unitName',
+  'curMonth',
+  'curYear',
+  'priceCur',
+  'priceVAT',
+  'createdAt'
+]);
