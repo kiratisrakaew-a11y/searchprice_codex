@@ -130,7 +130,8 @@ function loadActiveAliasDictionary_(spreadsheet) {
       canonical_term: cleanDisplayText_(row.canonical_term),
       related_terms: splitAliasTerms_(row.related_terms),
       category_hint: cleanDisplayText_(row.category_hint),
-      source_type_hint: cleanDisplayText_(row.source_type_hint)
+      source_type_hint: cleanDisplayText_(row.source_type_hint),
+      active: cleanDisplayText_(row.active)
     };
   });
 
@@ -146,43 +147,7 @@ function splitAliasTerms_(value) {
 }
 
 function buildAliasTermsForRecord_(record, aliases) {
-  if (!aliases || !aliases.length) {
-    return '';
-  }
-
-  var searchableText = normalizeText_([
-    record.item_name_original,
-    record.item_name_clean,
-    record.category_level_1,
-    record.category_level_2,
-    record.category_level_3,
-    record.unit,
-    record.note
-  ].join(' '));
-  var aliasTerms = [];
-
-  aliases.forEach(function(alias) {
-    var sourceTypeHint = normalizeText_(alias.source_type_hint);
-    if (sourceTypeHint && sourceTypeHint !== normalizeText_(record.source_type)) {
-      return;
-    }
-
-    var matchTerms = [alias.user_term, alias.canonical_term, alias.category_hint].concat(alias.related_terms || []);
-    var matched = matchTerms.some(function(term) {
-      var normalizedTerm = normalizeText_(term);
-      return normalizedTerm && searchableText.indexOf(normalizedTerm) !== -1;
-    });
-
-    if (matched) {
-      addUniqueAliasTerm_(aliasTerms, alias.user_term);
-      addUniqueAliasTerm_(aliasTerms, alias.canonical_term);
-      (alias.related_terms || []).forEach(function(term) {
-        addUniqueAliasTerm_(aliasTerms, term);
-      });
-    }
-  });
-
-  return aliasTerms.join(', ');
+  return enrichAliasTermsFromDictionary_(record, aliases);
 }
 
 function addUniqueAliasTerm_(terms, term) {

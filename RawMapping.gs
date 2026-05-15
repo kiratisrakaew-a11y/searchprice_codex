@@ -250,7 +250,7 @@ function mapLaborCostRow_(config, rawRow, options) {
     update_frequency: config.update_frequency,
     item_code: cleanDisplayText_(rawRow.item_code),
     item_name_original: itemNameOriginal,
-    item_name_clean: cleanItemName_(itemNameOriginal),
+    item_name_clean: generateItemNameClean_(itemNameOriginal),
     category_level_1: cleanDisplayText_(rawRow.category_l1),
     category_level_2: cleanDisplayText_(rawRow.category_l2),
     category_level_3: cleanDisplayText_(rawRow.category_l3),
@@ -283,7 +283,7 @@ function mapMaterialObecRow_(config, rawRow, options) {
     update_frequency: config.update_frequency,
     item_code: cleanDisplayText_(rawRow.item_code),
     item_name_original: itemNameOriginal,
-    item_name_clean: cleanItemName_(itemNameOriginal),
+    item_name_clean: generateItemNameClean_(itemNameOriginal),
     category_level_1: cleanDisplayText_(rawRow.category_l1),
     category_level_2: cleanDisplayText_(rawRow.category_l2),
     category_level_3: cleanDisplayText_(rawRow.category_l3),
@@ -314,7 +314,7 @@ function mapTpsoRow_(config, rawRow, options) {
     update_frequency: config.update_frequency,
     item_code: cleanDisplayText_(rawRow.commodityCode),
     item_name_original: itemNameOriginal,
-    item_name_clean: cleanItemName_(itemNameOriginal),
+    item_name_clean: generateItemNameClean_(itemNameOriginal),
     category_level_1: '',
     category_level_2: '',
     category_level_3: cleanDisplayText_(rawRow.typeName),
@@ -373,33 +373,11 @@ function buildStagingRecord_(values) {
 }
 
 function buildSearchKeywords_(record) {
-  return normalizeText_([
-    record.item_name_clean,
-    record.category_level_1,
-    record.category_level_2,
-    record.category_level_3,
-    record.unit,
-    record.note
-  ].filter(function(value) {
-    return value !== '' && value !== null && value !== undefined;
-  }).join(' '));
+  return generateSearchKeywords_(record);
 }
 
 function buildNormalizedText_(record) {
-  return normalizeText_([
-    record.item_code,
-    record.item_name_original,
-    record.item_name_clean,
-    record.category_level_1,
-    record.category_level_2,
-    record.category_level_3,
-    record.unit,
-    record.note,
-    record.search_keywords,
-    record.alias_terms
-  ].filter(function(value) {
-    return value !== '' && value !== null && value !== undefined;
-  }).join(' '));
+  return generateNormalizedText_(record);
 }
 
 function combineNotes_(rowNote, contextNote) {

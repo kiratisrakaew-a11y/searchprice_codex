@@ -200,3 +200,43 @@ function runMilestone8RefreshLogSmokeTest() {
     validation: validateRefreshLogRecord_(record)
   });
 }
+
+
+/**
+ * Static smoke test for Milestone 9 search helper fields and alias enrichment.
+ */
+function runMilestone9SearchHelperSmokeTest() {
+  var record = {
+    item_name_original: 'สาย VAF 2x2.5 20mm 1/2" THW',
+    item_name_clean: generateItemNameClean_('สาย VAF 2x2.5 20mm 1/2" THW'),
+    category_level_1: 'ไฟฟ้า',
+    category_level_2: '',
+    category_level_3: '',
+    unit: 'เมตร',
+    note: 'งานเดินสาย',
+    source_type: 'material',
+    price_basis: 'material_only'
+  };
+  record.alias_terms = enrichAliasTermsFromDictionary_(record, [{
+    user_term: 'สายไฟ',
+    canonical_term: 'สายไฟฟ้า',
+    related_terms: ['VAF', 'THW'],
+    category_hint: 'ไฟฟ้า',
+    source_type_hint: 'material',
+    active: 'yes'
+  }, {
+    user_term: 'ไม่ใช้',
+    canonical_term: 'inactive',
+    related_terms: ['VAF'],
+    category_hint: '',
+    source_type_hint: 'material',
+    active: 'no'
+  }]);
+  record.search_keywords = generateSearchKeywords_(record);
+  record.normalized_text = generateNormalizedText_(record);
+
+  return okResult_({
+    record: record,
+    specs: preserveTechnicalSpecSmokeResult_()
+  });
+}
