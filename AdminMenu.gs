@@ -32,6 +32,27 @@ function adminProcessSourceToStaging_(sourceName) {
   return result;
 }
 
+function adminRebuildAliasEnrichment() {
+  var selectedSource = getAdminSelectedSource_();
+  if (!selectedSource) {
+    return failResult_(createError_(
+      'admin_no_selected_source',
+      'Select a source by running one of the Process actions before rebuilding alias enrichment.',
+      {},
+      'warning'
+    ));
+  }
+
+  // Alias enrichment is applied during the raw-to-staging normalization step.
+  // Re-running processSelectedSourceToStaging regenerates alias_terms_used and search_keywords
+  // using the current ALIAS_DICTIONARY content, without writing to ALIAS_DICTIONARY itself.
+  var result = processSelectedSourceToStaging(selectedSource, { triggered_by: 'admin_menu_alias_rebuild' });
+  if (result.ok) {
+    clearAdminValidationState_();
+  }
+  return result;
+}
+
 function adminValidateStaging() {
   var selectedSource = getAdminSelectedSource_();
   if (!selectedSource) {

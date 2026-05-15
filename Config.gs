@@ -55,3 +55,39 @@ const PHASE1_TPSO_HEADER_MARKERS = Object.freeze([
   'priceVAT',
   'createdAt'
 ]);
+
+/**
+ * TPSO public API endpoint (docs/08_TPSO_API_SPEC.md).
+ * Public API; no credential required.
+ */
+const PHASE1_TPSO_API_URL = 'https://index-api.tpso.go.th/OpenApi/CmiPrice/Month';
+
+/**
+ * Allowlist of sheets that appendRowsByHeader_ may write to.
+ * MASTER is allowed but additionally gated by validation_passed=true.
+ */
+const PHASE1_SAFE_APPEND_SHEETS = Object.freeze([
+  PHASE1_SHEETS.STAGING,
+  PHASE1_SHEETS.MASTER,
+  PHASE1_SHEETS.REFRESH_LOG,
+  PHASE1_SHEETS.SEARCH_LOG
+]);
+
+/**
+ * Allowlist of sheets that safeClearRange_ may clear.
+ * MASTER is explicitly forbidden inside validateClearGuard_ regardless.
+ * TPSO response area (rows 4+) is cleared during refresh; rows 1-3 are protected by row guard.
+ */
+const PHASE1_SAFE_CLEAR_SHEETS = Object.freeze([
+  PHASE1_SHEETS.STAGING,
+  PHASE1_SHEETS.MATERIAL_TPSO
+]);
+
+/**
+ * Document property keys used by the admin menu workflow to remember the
+ * currently selected source and the most recent validation state.
+ */
+const PHASE1_ADMIN_SELECTED_SOURCE_PROPERTY = 'PHASE1_ADMIN_SELECTED_SOURCE';
+const PHASE1_ADMIN_VALIDATED_SOURCE_PROPERTY = 'PHASE1_ADMIN_VALIDATED_SOURCE';
+const PHASE1_ADMIN_VALIDATION_PASSED_PROPERTY = 'PHASE1_ADMIN_VALIDATION_PASSED';
+const PHASE1_ADMIN_VALIDATION_AT_PROPERTY = 'PHASE1_ADMIN_VALIDATION_AT';

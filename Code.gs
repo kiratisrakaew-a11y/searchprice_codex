@@ -6,6 +6,18 @@ function onOpen() {
     .createMenu('Phase 1 Price DB')
     .addItem('Setup / Validate Sheets', 'setupPhase1Sheets')
     .addItem('Validate Sheet Schema', 'validatePhase1Sheets')
+    .addSeparator()
+    .addItem('Refresh TPSO from API', 'adminRefreshTpsoFromApi')
+    .addItem('Process CGD Labor', 'adminProcessCgdLabor')
+    .addItem('Process OBEC Labor', 'adminProcessObecLabor')
+    .addItem('Process OBEC Material', 'adminProcessObecMaterial')
+    .addItem('Process TPSO Material', 'adminProcessTpsoMaterial')
+    .addItem('Rebuild/Refresh Alias Enrichment', 'adminRebuildAliasEnrichment')
+    .addItem('Validate Staging', 'adminValidateStaging')
+    .addItem('Update Master for Selected Source', 'adminUpdateMasterForSelectedSource')
+    .addItem('View Last Refresh Status', 'adminViewLastRefreshStatus')
+    .addSeparator()
+    .addItem('Run Phase 1 Checks', 'adminRunPhase1TestChecks')
     .addToUi();
 }
 
