@@ -316,10 +316,7 @@ function logTpsoRefreshAttempt_(data) {
     triggered_by: data.triggered_by
   };
 
-  return appendRowsByHeader_(PHASE1_SHEETS.REFRESH_LOG, record, {
-    spreadsheet: data.spreadsheet,
-    required_headers: PHASE1_SCHEMAS.REFRESH_LOG
-  });
+  return writeRefreshLog_(record, { spreadsheet: data.spreadsheet });
 }
 
 function countTpsoRawDataRows_(sheet) {

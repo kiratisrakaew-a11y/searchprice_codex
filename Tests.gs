@@ -171,3 +171,32 @@ function runMilestone7MasterUpdateSmokeTest() {
     compressed_ranges: compressRowNumbersToRanges_([2, 3, 4, 8, 10, 11])
   });
 }
+
+
+/**
+ * Static smoke test for Milestone 8 REFRESH_LOG record validation.
+ */
+function runMilestone8RefreshLogSmokeTest() {
+  var record = buildRefreshLogRecord_({
+    source_name: PHASE1_SHEETS.MATERIAL_TPSO,
+    refresh_type: 'api',
+    status: 'failed',
+    action_taken: 'kept_existing_master_data',
+    source_row_count_before: 10,
+    source_row_count_after: 10,
+    staging_row_count: 0,
+    master_row_count_before: 100,
+    master_row_count_after: 100,
+    validation_pass_count: 0,
+    validation_warning_count: 0,
+    validation_fail_count: 1,
+    needs_review_count: 0,
+    error_message: 'network failed',
+    triggered_by: 'test'
+  });
+
+  return okResult_({
+    record: record,
+    validation: validateRefreshLogRecord_(record)
+  });
+}

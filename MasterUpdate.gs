@@ -346,8 +346,5 @@ function buildMasterUpdateLogRecord_(sourceName, startedAt, status, actionTaken,
 }
 
 function appendMasterUpdateLog_(spreadsheet, record) {
-  return appendRowsByHeader_(PHASE1_SHEETS.REFRESH_LOG, record, {
-    spreadsheet: spreadsheet,
-    required_headers: PHASE1_SCHEMAS.REFRESH_LOG
-  });
+  return writeRefreshLog_(record, { spreadsheet: spreadsheet });
 }
