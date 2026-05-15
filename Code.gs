@@ -1,21 +1,11 @@
 /**
- * Adds the Phase 1 admin/manual action menu with safe workflow entrypoints.
+ * Adds a small Phase 1 setup menu for schema initialization and validation.
  */
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Phase 1 Price DB')
-    .addItem('Refresh TPSO from API', 'adminRefreshTpsoFromApi')
-    .addSeparator()
-    .addItem('Process CGD Labor', 'adminProcessCgdLabor')
-    .addItem('Process OBEC Labor', 'adminProcessObecLabor')
-    .addItem('Process OBEC Material', 'adminProcessObecMaterial')
-    .addItem('Process TPSO Material', 'adminProcessTpsoMaterial')
-    .addSeparator()
-    .addItem('Validate Staging', 'adminValidateStaging')
-    .addItem('Update Master for Selected Source', 'adminUpdateMasterForSelectedSource')
-    .addSeparator()
-    .addItem('View Last Refresh Status', 'adminViewLastRefreshStatus')
-    .addItem('Run Phase 1 Test Checks', 'adminRunPhase1TestChecks')
+    .addItem('Setup / Validate Sheets', 'setupPhase1Sheets')
+    .addItem('Validate Sheet Schema', 'validatePhase1Sheets')
     .addToUi();
 }
 
@@ -42,7 +32,6 @@ function checkRequiredSheets() {
 function createMissingPhase1SchemaSheets() {
   var spreadsheet = getActiveSpreadsheet_();
   var createdSheets = [];
-  var writes = [];
 
   PHASE1_SCHEMA_MANAGED_SHEETS.forEach(function(sheetName) {
     var schema = getExpectedSchema_(sheetName);
@@ -50,14 +39,10 @@ function createMissingPhase1SchemaSheets() {
     if (result.created) {
       createdSheets.push(sheetName);
     }
-    if (result.write) {
-      writes.push(result.write);
-    }
   });
 
   return {
-    created_sheets: createdSheets,
-    writes: writes
+    created_sheets: createdSheets
   };
 }
 
@@ -69,7 +54,6 @@ function setupPhase1Sheets() {
   var creation = createMissingPhase1SchemaSheets();
   var validation = validatePhase1Sheets();
   validation.created_sheets = creation.created_sheets;
-  validation.writes = creation.writes;
   return validation;
 }
 
