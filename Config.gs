@@ -55,6 +55,8 @@ const PHASE1_SAFE_CLEAR_SHEETS = Object.freeze([
   PHASE1_SHEETS.MATERIAL_TPSO
 ]);
 
+const PHASE1_TPSO_API_URL = 'https://index-api.tpso.go.th/OpenApi/CmiPrice/Month';
+
 const PHASE1_TPSO_HEADER_MARKERS = Object.freeze([
   'id',
   'type',

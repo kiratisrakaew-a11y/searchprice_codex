@@ -6,6 +6,8 @@ function onOpen() {
     .createMenu('Phase 1 Price DB')
     .addItem('Setup / Validate Sheets', 'setupPhase1Sheets')
     .addItem('Validate Sheet Schema', 'validatePhase1Sheets')
+    .addSeparator()
+    .addItem('Refresh TPSO API (Manual)', 'refreshTpsoFromApiManual')
     .addToUi();
 }
 

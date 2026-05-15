@@ -77,3 +77,28 @@ function runMilestone3RawMappingSmokeTest() {
     tpso: tpsoResult
   });
 }
+
+
+/**
+ * Static smoke test for Milestone 4 TPSO response validation helpers.
+ */
+function runMilestone4TpsoApiValidationSmokeTest() {
+  var sampleRows = [{
+    id: '1',
+    type: '10',
+    typeName: 'ส่วนกลาง',
+    commodityCode: 'T001',
+    commodityNameTH: 'วัสดุ TPSO',
+    unitName: 'หน่วย',
+    curMonth: '4',
+    curYear: '2569',
+    priceCur: '450.50',
+    priceVAT: '482.04',
+    createdAt: '2026-05-12T00:00:00Z'
+  }];
+
+  return okResult_({
+    extract: extractTpsoResponseRows_({ data: sampleRows }),
+    validate: validateTpsoApiRows_(sampleRows)
+  });
+}
