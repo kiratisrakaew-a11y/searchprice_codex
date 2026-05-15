@@ -27,7 +27,12 @@ function compareUserPriceToMaster_(masterRow, input) {
 
   var referencePrice = referenceResult.data.reference_price;
   var userUnitPrice = normalizedInput.user_price / normalizedInput.user_quantity;
-  var conversionResult = convertPricePerUnitToReferenceUnit_(userUnitPrice, normalizedInput.user_unit, masterRow.unit);
+  var conversionResult = convertPricePerUnitWithGeminiFallback_(userUnitPrice, normalizedInput.user_unit, masterRow.unit, {
+    user_quantity: normalizedInput.user_quantity,
+    user_price_type: normalizedInput.user_price_type,
+    selected_item_name: masterRow.item_name_clean || masterRow.item_name_original,
+    note: masterRow.note
+  });
   if (!conversionResult.ok) {
     return buildCannotCompareResult_(masterRow, normalizedInput, 'Cannot compare because units could not be converted safely.', {
       reference_price: referencePrice,
@@ -58,6 +63,7 @@ function compareUserPriceToMaster_(masterRow, input) {
     variance_amount: roundForDisplay_(varianceAmount),
     variance_percent: roundForDisplay_(variancePercent),
     conversion_status: conversionResult.data.conversion_status,
+    conversion_source: conversionResult.data.conversion_source || '',
     conversion_note: conversionResult.data.conversion_note,
     assumption_used: conversionResult.data.assumption_used || '',
     cannot_compare_reason: '',
@@ -159,6 +165,7 @@ function buildCannotCompareResult_(masterRow, normalizedInput, reason, extra) {
     variance_amount: '',
     variance_percent: '',
     conversion_status: 'cannot_convert',
+    conversion_source: details.conversion_source || '',
     conversion_note: details.conversion_note || reason,
     assumption_used: '',
     cannot_compare_reason: details.cannot_compare_reason || reason,

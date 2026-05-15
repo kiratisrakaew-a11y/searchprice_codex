@@ -399,3 +399,70 @@ function runMilestone12PriceComparisonSmokeTest() {
     writes_performed: []
   });
 }
+
+
+/**
+ * Static smoke test for Milestone 13 unit conversion rule-first and Gemini boundaries.
+ * Does not call the external Gemini API.
+ */
+function runMilestone13UnitConversionSmokeTest() {
+  var sameUnit = convertPricePerUnitWithGeminiFallback_(100, 'kg', 'kg', {});
+  var ruleBased = convertPricePerUnitWithGeminiFallback_(90000, 'ton', 'kg', {});
+  var noKeyFallback = convertPricePerUnitWithGeminiFallback_(120, 'bag', 'kg', {
+    selected_item_name: 'ทดสอบถุง',
+    user_quantity: 1,
+    user_price_type: 'material'
+  });
+  var structured = parseGeminiUnitConversionText_(JSON.stringify({
+    status: 'success',
+    conversion_possible: true,
+    required_user_input: '',
+    conversion_factor: 50,
+    converted_value: 2.4,
+    converted_unit: 'kg',
+    assumption_used: 'User provided 50 kg per bag.',
+    explanation: 'Converted bag price to kg price using provided bag weight.',
+    cannot_compare_reason: ''
+  }));
+  var needMoreInfo = parseGeminiUnitConversionText_(JSON.stringify({
+    status: 'need_more_info',
+    conversion_possible: false,
+    required_user_input: 'meters per roll',
+    conversion_factor: '',
+    converted_value: '',
+    converted_unit: '',
+    assumption_used: '',
+    explanation: 'Need roll length before converting roll to meter.',
+    cannot_compare_reason: 'missing meters per roll'
+  }));
+
+  if (!sameUnit.ok || sameUnit.data.conversion_source !== 'rule_based' || sameUnit.data.conversion_status !== 'same_unit') {
+    return failResult_(createError_('unit_same_unit_failed', 'Exact unit match should compare directly through rule-based path.', { result: sameUnit }, 'critical'));
+  }
+  if (!ruleBased.ok || ruleBased.data.conversion_source !== 'rule_based' || ruleBased.data.comparable_price !== 90) {
+    return failResult_(createError_('unit_rule_first_failed', 'Rule-based conversion should run before Gemini.', { result: ruleBased }, 'critical'));
+  }
+  if (noKeyFallback.ok || noKeyFallback.error.code !== 'unit_conversion_unavailable') {
+    return failResult_(createError_('unit_gemini_failure_fallback_failed', 'Gemini failure/missing key should safely return conversion unavailable.', { result: noKeyFallback }, 'critical'));
+  }
+  if (!structured.ok || structured.data.interpretation.status !== 'success' || structured.data.interpretation.conversion_possible !== true) {
+    return failResult_(createError_('unit_gemini_structured_success_failed', 'Gemini structured success parsing failed.', { result: structured }, 'critical'));
+  }
+  if (!needMoreInfo.ok || needMoreInfo.data.interpretation.status !== 'need_more_info') {
+    return failResult_(createError_('unit_gemini_need_more_info_failed', 'Gemini need_more_info structured parsing failed.', { result: needMoreInfo }, 'critical'));
+  }
+
+  return okResult_({
+    same_unit: sameUnit.data,
+    rule_based: ruleBased.data,
+    no_key_fallback: noKeyFallback.error.code,
+    structured_success: structured.data.interpretation,
+    structured_need_more_info: needMoreInfo.data.interpretation,
+    gemini_safety: {
+      guesses_prices: false,
+      edits_master: false,
+      approves_or_rejects: false,
+      acts_as_search_engine: false
+    }
+  });
+}
