@@ -46,7 +46,7 @@ function searchMasterPriceDatabase(query, options) {
       no_direct_match: true,
       session_id: sessionId
     });
-    writeSearchLog_({
+    writeSearchLog_(buildSearchLogRecord_({
       searched_at: startedAt,
       user_query: query || '',
       normalized_query: normalizedQuery,
@@ -58,7 +58,7 @@ function searchMasterPriceDatabase(query, options) {
       user_selected_master_id: '',
       feedback: '',
       session_id: sessionId
-    }, opts);
+    }), opts);
     return emptyResult;
   }
 
@@ -67,6 +67,19 @@ function searchMasterPriceDatabase(query, options) {
     required_headers: PHASE1_SCHEMAS.MASTER_PRICE_DATABASE
   });
   if (!readResult.ok) {
+    writeSearchLog_(buildSearchLogRecord_({
+      searched_at: startedAt,
+      user_query: query || '',
+      normalized_query: normalizedQuery,
+      result_count: 0,
+      top_match_id: '',
+      top_match_score: '',
+      no_result_flag: 'yes',
+      suggested_terms: '',
+      user_selected_master_id: '',
+      feedback: '',
+      session_id: sessionId
+    }), opts);
     return readResult;
   }
 
@@ -87,7 +100,7 @@ function searchMasterPriceDatabase(query, options) {
   var noDirectMatch = directResults.length === 0;
 
   var topResult = resultCards[0] || null;
-  writeSearchLog_({
+  writeSearchLog_(buildSearchLogRecord_({
     searched_at: startedAt,
     user_query: query || '',
     normalized_query: normalizedQuery,
@@ -99,7 +112,7 @@ function searchMasterPriceDatabase(query, options) {
     user_selected_master_id: '',
     feedback: '',
     session_id: sessionId
-  }, opts);
+  }), opts);
 
   return okResult_({
     query: query || '',
@@ -258,6 +271,23 @@ function buildSuggestedTerms_(scoredResults, normalizedQuery) {
   return suggestions;
 }
 
+function buildSearchLogRecord_(record) {
+  return normalizeSearchLogRecord_(record || {});
+}
+
+function validateSearchLogRecordForMilestone15_(record) {
+  var normalizedRecord = buildSearchLogRecord_(record || {});
+  var missingFields = PHASE1_SCHEMAS.SEARCH_LOG.filter(function(fieldName) {
+    return !Object.prototype.hasOwnProperty.call(normalizedRecord, fieldName);
+  });
+  if (missingFields.length) {
+    return failResult_(createError_('search_log_record_missing_fields', 'SEARCH_LOG record is missing required fields.', {
+      missing_fields: missingFields
+    }, 'critical'));
+  }
+  return okResult_({ record: normalizedRecord });
+}
+
 function writeSearchLog_(record, options) {
   var opts = options || {};
   var spreadsheet = opts.spreadsheet || getActiveSpreadsheet_();
@@ -266,7 +296,7 @@ function writeSearchLog_(record, options) {
     return ensureResult;
   }
 
-  var normalizedRecord = normalizeSearchLogRecord_(record || {});
+  var normalizedRecord = buildSearchLogRecord_(record || {});
   return appendRowsByHeader_(PHASE1_SHEETS.SEARCH_LOG, normalizedRecord, {
     spreadsheet: spreadsheet,
     required_headers: PHASE1_SCHEMAS.SEARCH_LOG
@@ -302,10 +332,11 @@ function normalizeSearchLogRecord_(record) {
 function updateSearchLogSelection_(sessionId, selectedMasterId, options) {
   var opts = options || {};
   var spreadsheet = opts.spreadsheet || getActiveSpreadsheet_();
-  var sheet = getSheetByName_(spreadsheet, PHASE1_SHEETS.SEARCH_LOG);
-  if (!sheet) {
-    return failResult_(createError_('search_log_missing', 'SEARCH_LOG sheet not found', {}, 'warning'));
+  var ensureResult = ensureSearchLogSheetReady_(spreadsheet);
+  if (!ensureResult.ok) {
+    return ensureResult;
   }
+  var sheet = ensureResult.data.sheet;
   var headerMap = getHeaderMapForSheet_(sheet);
   var sessionColumn = getColumnNumberByHeader_(headerMap, 'session_id');
   var selectedColumn = getColumnNumberByHeader_(headerMap, 'user_selected_master_id');
@@ -317,11 +348,16 @@ function updateSearchLogSelection_(sessionId, selectedMasterId, options) {
   if (lastRow < 2) {
     return okResult_({ updated: false });
   }
+  var normalizedSessionId = cleanDisplayText_(sessionId);
+  var normalizedSelectedMasterId = cleanDisplayText_(selectedMasterId);
+  if (!normalizedSessionId || !normalizedSelectedMasterId) {
+    return okResult_({ updated: false, reason: 'missing_session_or_selected_master_id' });
+  }
   var sessions = sheet.getRange(2, sessionColumn, lastRow - 1, 1).getDisplayValues();
   for (var index = sessions.length - 1; index >= 0; index--) {
-    if (sessions[index][0] === sessionId) {
+    if (cleanDisplayText_(sessions[index][0]) === normalizedSessionId) {
       var rowNumber = index + 2;
-      sheet.getRange(rowNumber, selectedColumn).setValue(selectedMasterId);
+      sheet.getRange(rowNumber, selectedColumn).setValue(normalizedSelectedMasterId);
       return okResult_({ updated: true, row_number: rowNumber });
     }
   }

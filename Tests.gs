@@ -543,3 +543,76 @@ function runMilestone14GeminiBoundarySmokeTest() {
     sends_master_database_to_gemini: false
   });
 }
+
+/**
+ * Static smoke test for Milestone 15 SEARCH_LOG contracts without mutating sheets.
+ */
+function runMilestone15SearchLogSmokeTest() {
+  var searchRecord = buildSearchLogRecord_({
+    searched_at: '2026-05-15T00:00:00+00:00',
+    user_query: 'ปูนซีเมนต์',
+    normalized_query: normalizeSearchQuery_('ปูนซีเมนต์'),
+    result_count: 3,
+    top_match_id: 'MST-1',
+    top_match_score: 95,
+    no_result_flag: 'no',
+    suggested_terms: 'ปูน, ซีเมนต์',
+    user_selected_master_id: '',
+    session_id: 'SESSION-1'
+  });
+  var noResultRecord = buildSearchLogRecord_({
+    searched_at: '2026-05-15T00:01:00+00:00',
+    user_query: 'no-such-query',
+    normalized_query: normalizeSearchQuery_('no-such-query'),
+    result_count: 0,
+    no_result_flag: 'yes',
+    suggested_terms: '',
+    session_id: 'SESSION-2'
+  });
+  var selectedRecord = buildSearchLogRecord_({
+    searched_at: '2026-05-15T00:02:00+00:00',
+    user_query: 'สายไฟ',
+    normalized_query: normalizeSearchQuery_('สายไฟ'),
+    result_count: 1,
+    top_match_id: 'MST-2',
+    top_match_score: 88,
+    no_result_flag: 'no',
+    user_selected_master_id: 'MST-2',
+    session_id: 'SESSION-3'
+  });
+
+  var searchValidation = validateSearchLogRecordForMilestone15_(searchRecord);
+  var noResultValidation = validateSearchLogRecordForMilestone15_(noResultRecord);
+  var selectedValidation = validateSearchLogRecordForMilestone15_(selectedRecord);
+  var feedbackOptional = Object.prototype.hasOwnProperty.call(searchRecord, 'feedback') && searchRecord.feedback === '';
+  var schemasComparisonLogFree = !Object.prototype.hasOwnProperty.call(PHASE1_SCHEMAS, 'COMPARISON_LOG');
+
+  if (!searchValidation.ok || !noResultValidation.ok || !selectedValidation.ok) {
+    return failResult_(createError_('search_log_record_validation_failed', 'SEARCH_LOG records must contain every required field.', {
+      search_validation: searchValidation,
+      no_result_validation: noResultValidation,
+      selected_validation: selectedValidation
+    }, 'critical'));
+  }
+  if (noResultRecord.no_result_flag !== 'yes' || noResultRecord.result_count !== 0) {
+    return failResult_(createError_('search_log_no_result_contract_failed', 'No-result searches must log result_count=0 and no_result_flag=yes.', { record: noResultRecord }, 'critical'));
+  }
+  if (selectedRecord.user_selected_master_id !== 'MST-2') {
+    return failResult_(createError_('search_log_selection_contract_failed', 'Selected result should be recorded in user_selected_master_id when possible.', { record: selectedRecord }, 'critical'));
+  }
+  if (!feedbackOptional) {
+    return failResult_(createError_('search_log_feedback_optional_failed', 'Feedback must remain optional in Phase 1.', { record: searchRecord }, 'critical'));
+  }
+  if (!schemasComparisonLogFree) {
+    return failResult_(createError_('comparison_log_schema_forbidden', 'COMPARISON_LOG must not exist in Phase 1 schemas.', {}, 'critical'));
+  }
+
+  return okResult_({
+    search_record: searchRecord,
+    no_result_record: noResultRecord,
+    selected_record: selectedRecord,
+    feedback_optional: feedbackOptional,
+    comparison_log_absent: schemasComparisonLogFree,
+    required_fields: PHASE1_SCHEMAS.SEARCH_LOG.slice()
+  });
+}
