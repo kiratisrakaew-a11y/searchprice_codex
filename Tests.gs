@@ -149,3 +149,25 @@ function runMilestone6ValidationSmokeTest() {
     invalid_row: invalidRowResult
   });
 }
+
+
+/**
+ * Static smoke test for Milestone 7 staging-to-master conversion helpers.
+ */
+function runMilestone7MasterUpdateSmokeTest() {
+  var stagingRow = mapRawRowToCommonSchema_(PHASE1_SHEETS.MATERIAL_TPSO, {
+    commodityCode: 'T001',
+    commodityNameTH: 'วัสดุ TPSO',
+    unitName: 'หน่วย',
+    priceCur: '450.50',
+    curYear: '2569',
+    curMonth: '4',
+    typeName: 'ส่วนกลาง',
+    createdAt: '2026-05-12T00:00:00Z'
+  }).data.row;
+
+  return okResult_({
+    master_row: convertStagingRowToMasterRow_(stagingRow, getCurrentTimestamp_()),
+    compressed_ranges: compressRowNumbersToRanges_([2, 3, 4, 8, 10, 11])
+  });
+}

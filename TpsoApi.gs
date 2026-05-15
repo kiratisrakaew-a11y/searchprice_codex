@@ -38,7 +38,7 @@ function refreshTpsoFromApi_(options) {
   }
 
   var afterCount = countTpsoRawDataRows_(sourceSheet);
-  var logResult = logTpsoRefreshAttempt_({
+  var logResult = opts.log_success === false ? null : logTpsoRefreshAttempt_({
     spreadsheet: spreadsheet,
     started_at: startedAt,
     finished_at: getCurrentTimestamp_(),

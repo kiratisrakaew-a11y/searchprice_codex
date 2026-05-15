@@ -7,7 +7,8 @@ function onOpen() {
     .addItem('Setup / Validate Sheets', 'setupPhase1Sheets')
     .addItem('Validate Sheet Schema', 'validatePhase1Sheets')
     .addSeparator()
-    .addItem('Refresh TPSO API (Manual)', 'refreshTpsoFromApiManual')
+    .addItem('Refresh TPSO API (Manual Raw Only)', 'refreshTpsoFromApiManual')
+    .addItem('Refresh TPSO API + Update Master', 'refreshTpsoApiNormalizeValidateUpdateMasterManual')
     .addSeparator()
     .addItem('Process laborcost_cgd to Staging', 'processLaborCostCgdToStaging')
     .addItem('Process laborcost_obec to Staging', 'processLaborCostObecToStaging')
@@ -15,6 +16,11 @@ function onOpen() {
     .addItem('Process materialcost_tpso to Staging', 'processMaterialCostTpsoToStaging')
     .addSeparator()
     .addItem('Validate Staging', 'validateCurrentStagingForMasterUpdate')
+    .addSeparator()
+    .addItem('Update Master: laborcost_cgd', 'updateMasterForLaborCostCgd')
+    .addItem('Update Master: laborcost_obec', 'updateMasterForLaborCostObec')
+    .addItem('Update Master: materialcost_obec', 'updateMasterForMaterialCostObec')
+    .addItem('Update Master: materialcost_tpso', 'updateMasterForMaterialCostTpso')
     .addToUi();
 }
 
