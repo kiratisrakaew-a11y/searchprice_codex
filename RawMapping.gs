@@ -305,7 +305,6 @@ function mapMaterialObecRow_(config, rawRow, options) {
 function mapTpsoRow_(config, rawRow, options) {
   var priceCur = parseNumber_(rawRow.priceCur);
   var itemNameOriginal = cleanDisplayText_(rawRow.commodityNameTH);
-  var createdAtNote = cleanDisplayText_(rawRow.createdAt);
 
   return buildStagingRecord_({
     aliases: options.aliases || [],
@@ -328,7 +327,7 @@ function mapTpsoRow_(config, rawRow, options) {
     region: cleanDisplayText_(rawRow.typeName),
     effective_year: cleanDisplayText_(rawRow.curYear),
     effective_month: cleanDisplayText_(rawRow.curMonth),
-    note: createdAtNote ? 'createdAt: ' + createdAtNote : '',
+    note: '',
     staged_at: options.staged_at || getCurrentTimestamp_()
   });
 }
