@@ -240,3 +240,40 @@ function runMilestone9SearchHelperSmokeTest() {
     specs: preserveTechnicalSpecSmokeResult_()
   });
 }
+
+
+/**
+ * Static smoke test for Milestone 10 search scoring helpers without sheet reads.
+ */
+function runMilestone10SearchEngineSmokeTest() {
+  var query = normalizeSearchQuery_('สาย VAF 2x2.5');
+  var scored = scoreMasterRowForQuery_({
+    master_id: 'MST-1',
+    item_name_original: 'สายไฟ VAF 2x2.5',
+    item_name_clean: 'สายไฟ VAF 2x2.5',
+    category_level_1: 'ไฟฟ้า',
+    category_level_2: '',
+    category_level_3: '',
+    unit: 'เมตร',
+    note: '',
+    search_keywords: 'สายไฟ vaf 2x2.5 ไฟฟ้า เมตร',
+    alias_terms: 'สายไฟ, cable',
+    normalized_text: 'สายไฟ vaf 2x2.5 ไฟฟ้า เมตร material material_only',
+    material_cost: '10',
+    labor_cost: '',
+    total_cost: '10',
+    price_basis: 'material_only',
+    data_status: 'active'
+  }, query);
+
+  return okResult_({
+    normalized_query: query,
+    scored: scored,
+    card: toSearchResultCard_(scored),
+    fuzzy_distance: calculateLevenshteinDistance_('cement', 'cememt')
+  });
+}
+
+function testSearchCement() {
+  return searchMasterPriceDatabase('ปูนซีเมนต์', { triggered_by: 'manual' });
+}

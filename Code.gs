@@ -6,6 +6,7 @@ function onOpen() {
     .createMenu('Phase 1 Price DB')
     .addItem('Setup / Validate Sheets', 'setupPhase1Sheets')
     .addItem('Validate Sheet Schema', 'validatePhase1Sheets')
+    .addItem('Test Search ปูนซีเมนต์', 'testSearchCement')
     .addSeparator()
     .addItem('Refresh TPSO API (Manual Raw Only)', 'refreshTpsoFromApiManual')
     .addItem('Refresh TPSO API + Update Master', 'refreshTpsoApiNormalizeValidateUpdateMasterManual')
