@@ -403,6 +403,35 @@
       .classification.lower_than_reference  { background: #dbeafe; color: #1e40af; border-left-color: #3b82f6; }
       .classification.cannot_compare        { background: #fee2e2; color: #b91c1c; border-left-color: #ef4444; }
 
+      /* ── Back bar (detail view) ── */
+      .back-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      .back-btn {
+        background: transparent;
+        border: 1.5px solid var(--border);
+        color: var(--navy-800);
+        font-size: var(--text-sm);
+        font-weight: 600;
+        padding: 8px 14px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease;
+      }
+
+      .back-btn:hover {
+        background: var(--surface-alt);
+        border-color: var(--primary);
+      }
+
+      .back-context {
+        font-size: var(--text-sm);
+      }
+
       /* ── Responsive ── */
       @media (max-width: 640px) {
         .site-header-inner {
@@ -446,6 +475,7 @@
     </header>
 
     <main>
+      <div id="view-search">
       <section class="panel">
         <h1>ค้นหารายการราคา</h1>
         <p class="muted">ค้นหาในฐานข้อมูลราคากลาง แล้วเลือกรายการเพื่อดูรายละเอียดและเปรียบเทียบราคา</p>
@@ -465,6 +495,13 @@
         <div id="suggestions" class="muted"></div>
         <div id="results" class="cards"></div>
       </section>
+      </div><!-- /#view-search -->
+
+      <div id="view-detail" hidden>
+      <div class="back-bar">
+        <button id="back-button" type="button" class="back-btn">← กลับไปค้นหา</button>
+        <span class="back-context muted">รายการที่เลือก</span>
+      </div>
 
       <section id="detail-panel" class="panel" hidden>
         <h2>รายละเอียดรายการที่เลือก <span class="readonly-badge">อ่านอย่างเดียว</span></h2>
@@ -510,12 +547,14 @@
           <span id="compare-result-text"></span>
         </div>
       </section>
+      </div><!-- /#view-detail -->
     </main>
 
     <script>
       var state = {
         sessionId: '',
-        selectedMasterId: ''
+        selectedMasterId: '',
+        view: 'search'
       };
 
       var form = document.getElementById('search-form');
@@ -541,6 +580,9 @@
       var comparisonResultEl = document.getElementById('comparison-result');
       var compareSpinnerEl = document.getElementById('compare-spinner');
       var compareResultTextEl = document.getElementById('compare-result-text');
+      var viewSearchEl = document.getElementById('view-search');
+      var viewDetailEl = document.getElementById('view-detail');
+      var backButton = document.getElementById('back-button');
 
       form.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -552,8 +594,29 @@
         runComparison();
       });
 
+      backButton.addEventListener('click', function() {
+        resetAllSpinners_();
+        clearSelection();
+        showView('search');
+      });
+
+      function showView(name) {
+        state.view = name;
+        viewSearchEl.hidden = (name !== 'search');
+        viewDetailEl.hidden = (name !== 'detail');
+        window.scrollTo(0, 0);
+      }
+
+      function resetAllSpinners_() {
+        searchSpinnerEl.hidden = true;
+        compareSpinnerEl.hidden = true;
+        compareResultTextEl.textContent = '';
+        compareButton.disabled = false;
+      }
+
       function runSearch() {
         var query = queryInput.value.trim();
+        resetAllSpinners_();
         clearError();
         clearSelection();
         if (!query) {
@@ -666,6 +729,7 @@
           return;
         }
         renderSelectedDetail((response.data || {}).selected_item || {});
+        showView('detail');
       }
 
       function renderSelectedDetail(item) {
@@ -773,6 +837,9 @@
         detailEl.innerHTML = '';
         comparisonPanel.hidden = true;
         comparisonResultEl.innerHTML = '';
+        compareSpinnerEl.hidden = true;
+        compareResultTextEl.textContent = '';
+        compareButton.disabled = false;
       }
 
       function setLoading(isLoading, message) {
@@ -808,6 +875,7 @@
 
       function handleServerFailure(error) {
         setLoading(false, '');
+        resetAllSpinners_();
         showError(error && error.message ? error.message : 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์');
       }
 
