@@ -30,10 +30,11 @@ function doGet() {
  * search engine, which writes SEARCH_LOG and returns result cards without
  * source_name, source_type, or match_reason.
  */
-function webAppSearchPrices(query, sessionId) {
+function webAppSearchPrices(query, sessionId, priceFilter) {
   var result = searchMasterPriceDatabase(query, {
     triggered_by: 'webapp',
-    session_id: sessionId || ''
+    session_id: sessionId || '',
+    price_basis_filter: priceFilter || 'all'
   });
   if (!result.ok) {
     return result;

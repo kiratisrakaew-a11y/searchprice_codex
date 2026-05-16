@@ -264,8 +264,12 @@
         border: 2.5px solid var(--border);
         border-top-color: var(--primary);
         border-radius: 50%;
-        animation: spin 0.7s linear infinite;
+        animation: none;
         flex-shrink: 0;
+      }
+
+      .spinner.is-spinning {
+        animation: spin 0.7s linear infinite;
       }
 
       /* ── Misc ── */
@@ -432,6 +436,45 @@
         font-size: var(--text-sm);
       }
 
+      /* ── Filter bar ── */
+      .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: -8px 0 16px;
+      }
+
+      .filter-label {
+        font-size: var(--text-sm);
+        color: var(--muted);
+        font-weight: 500;
+      }
+
+      .filter-btn {
+        background: var(--surface);
+        border: 1.5px solid var(--border);
+        border-radius: 20px;
+        color: var(--muted);
+        font-family: inherit;
+        font-size: var(--text-sm);
+        font-weight: 500;
+        padding: 5px 14px;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s, color 0.15s;
+      }
+
+      .filter-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+      }
+
+      .filter-btn.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #ffffff;
+      }
+
       /* ── Responsive ── */
       @media (max-width: 640px) {
         .site-header-inner {
@@ -488,6 +531,13 @@
           <span id="status-text"></span>
         </div>
       </section>
+
+      <div class="filter-bar" id="filter-bar">
+        <span class="filter-label">ประเภท:</span>
+        <button type="button" class="filter-btn active" data-filter="all">ทั้งหมด</button>
+        <button type="button" class="filter-btn" data-filter="labor">ค่าแรง</button>
+        <button type="button" class="filter-btn" data-filter="material">ค่าวัสดุ</button>
+      </div>
 
       <section id="results-panel" class="panel" hidden>
         <h2>ผลการค้นหา</h2>
@@ -554,7 +604,8 @@
       var state = {
         sessionId: '',
         selectedMasterId: '',
-        view: 'search'
+        view: 'search',
+        priceFilter: 'all'
       };
 
       var form = document.getElementById('search-form');
@@ -600,6 +651,17 @@
         showView('search');
       });
 
+      document.querySelectorAll('.filter-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          state.priceFilter = btn.dataset.filter || 'all';
+          if (queryInput.value.trim()) {
+            runSearch();
+          }
+        });
+      });
+
       function showView(name) {
         state.view = name;
         viewSearchEl.hidden = (name !== 'search');
@@ -607,9 +669,19 @@
         window.scrollTo(0, 0);
       }
 
+      function showSpinner_(el) {
+        el.classList.add('is-spinning');
+        el.hidden = false;
+      }
+
+      function hideSpinner_(el) {
+        el.classList.remove('is-spinning');
+        el.hidden = true;
+      }
+
       function resetAllSpinners_() {
-        searchSpinnerEl.hidden = true;
-        compareSpinnerEl.hidden = true;
+        hideSpinner_(searchSpinnerEl);
+        hideSpinner_(compareSpinnerEl);
         compareResultTextEl.textContent = '';
         compareButton.disabled = false;
       }
@@ -633,7 +705,7 @@
         google.script.run
           .withSuccessHandler(handleSearchSuccess)
           .withFailureHandler(handleServerFailure)
-          .webAppSearchPrices(query, state.sessionId);
+          .webAppSearchPrices(query, state.sessionId, state.priceFilter);
       }
 
       function handleSearchSuccess(response) {
@@ -750,7 +822,7 @@
         comparisonPanel.hidden = false;
         userUnitInput.value = item.unit || userUnitInput.value;
         compareResultTextEl.textContent = '';
-        compareSpinnerEl.hidden = true;
+        hideSpinner_(compareSpinnerEl);
       }
 
       function runComparison() {
@@ -761,7 +833,7 @@
 
         clearError();
         compareButton.disabled = true;
-        compareSpinnerEl.hidden = false;
+        showSpinner_(compareSpinnerEl);
         compareResultTextEl.textContent = 'กำลังเปรียบเทียบ...';
         comparisonResultEl.className = 'status';
 
@@ -780,7 +852,7 @@
 
       function handleComparisonSuccess(response) {
         compareButton.disabled = false;
-        compareSpinnerEl.hidden = true;
+        hideSpinner_(compareSpinnerEl);
         compareResultTextEl.textContent = '';
         if (!response || !response.ok) {
           comparisonResultEl.className = 'status error';
@@ -792,7 +864,7 @@
 
       function handleComparisonFailure(error) {
         compareButton.disabled = false;
-        compareSpinnerEl.hidden = true;
+        hideSpinner_(compareSpinnerEl);
         compareResultTextEl.textContent = '';
         handleServerFailure(error);
       }
@@ -837,24 +909,24 @@
         detailEl.innerHTML = '';
         comparisonPanel.hidden = true;
         comparisonResultEl.innerHTML = '';
-        compareSpinnerEl.hidden = true;
+        hideSpinner_(compareSpinnerEl);
         compareResultTextEl.textContent = '';
         compareButton.disabled = false;
       }
 
       function setLoading(isLoading, message) {
         if (isLoading) {
-          searchSpinnerEl.hidden = false;
+          showSpinner_(searchSpinnerEl);
           statusTextEl.textContent = message || '';
           statusEl.className = 'status';
           searchButton.disabled = true;
         } else if (message) {
-          searchSpinnerEl.hidden = true;
+          hideSpinner_(searchSpinnerEl);
           statusTextEl.textContent = message;
           statusEl.className = 'status error';
           searchButton.disabled = false;
         } else {
-          searchSpinnerEl.hidden = true;
+          hideSpinner_(searchSpinnerEl);
           statusTextEl.textContent = '';
           statusEl.className = 'status';
           searchButton.disabled = false;
@@ -862,13 +934,13 @@
       }
 
       function showError(message) {
-        searchSpinnerEl.hidden = true;
+        hideSpinner_(searchSpinnerEl);
         statusTextEl.textContent = message;
         statusEl.className = 'status error';
       }
 
       function clearError() {
-        searchSpinnerEl.hidden = true;
+        hideSpinner_(searchSpinnerEl);
         statusTextEl.textContent = '';
         statusEl.className = 'status';
       }

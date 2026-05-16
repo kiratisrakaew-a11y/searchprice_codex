@@ -91,10 +91,17 @@ function searchMasterPriceDatabase(query, options) {
     return right.match_score - left.match_score;
   });
 
-  var directResults = scoredResults.filter(function(scored) {
+  var filteredResults = scoredResults;
+  if (opts.price_basis_filter === 'labor') {
+    filteredResults = scoredResults.filter(function(s) { return s.row.price_basis === 'labor_only'; });
+  } else if (opts.price_basis_filter === 'material') {
+    filteredResults = scoredResults.filter(function(s) { return s.row.price_basis === 'material_only'; });
+  }
+
+  var directResults = filteredResults.filter(function(scored) {
     return scored.match_score >= SEARCH_DIRECT_MATCH_THRESHOLD;
   });
-  var chosenResults = (directResults.length ? directResults : scoredResults).slice(0, SEARCH_RESULT_LIMIT);
+  var chosenResults = (directResults.length ? directResults : filteredResults).slice(0, SEARCH_RESULT_LIMIT);
   var resultCards = chosenResults.map(toSearchResultCard_);
   var suggestions = buildSuggestedTerms_(scoredResults, normalizedQuery);
   var noDirectMatch = directResults.length === 0;
