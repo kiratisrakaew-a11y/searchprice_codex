@@ -2,7 +2,7 @@
  * Milestone 10 Phase 1 search engine over MASTER_PRICE_DATABASE only.
  * Gemini is intentionally not used here.
  */
-const SEARCH_RESULT_LIMIT = 10;
+const SEARCH_RESULT_LIMIT = 20;
 const SEARCH_DIRECT_MATCH_THRESHOLD = 20;
 const SEARCH_FIELDS = Object.freeze([
   'item_name_original',
